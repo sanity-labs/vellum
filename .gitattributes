@@ -1,0 +1,2 @@
+# Preserve supplied Markdown fixtures, including code whitespace and line breaks.
+src/examples/*.md -whitespace
