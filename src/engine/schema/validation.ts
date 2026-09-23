@@ -5,12 +5,10 @@ import { z } from 'zod'
 import type { JsonObject } from '../../shared/json'
 import type { SchemaNode, SchemaRegistry } from './registry'
 
-const compiledSchemas = new WeakMap<
-  SchemaRegistry,
-  ReturnType<typeof createSchemaFromManifestTypes>
->()
+type CompiledSchema = ReturnType<typeof createSchemaFromManifestTypes>
+const compiledSchemas = new WeakMap<SchemaRegistry, CompiledSchema>()
 
-export function compileValidationSchema(registry: SchemaRegistry) {
+export function compileValidationSchema(registry: SchemaRegistry): CompiledSchema {
   let schema = compiledSchemas.get(registry)
   if (!schema) {
     schema = createSchemaFromManifestTypes(

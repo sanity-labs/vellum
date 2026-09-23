@@ -74,7 +74,7 @@ Nothing that isn't in the text gets in. Images stay as URLs, never asset referen
 
 ## Running it
 
-The hosted version at [vellum.sanity.build](https://vellum.sanity.build) needs nothing. To run your own, you need [Node.js](https://nodejs.org/) 24.2+, [pnpm](https://pnpm.io/installation) 12 (`corepack enable pnpm` picks the pinned version), and a TypeSafe API key from the [console](https://console.typesafe.ai). Conversions bill against that key.
+The hosted version at [vellum.sanity.build](https://vellum.sanity.build) needs nothing. To run your own, you need [Node.js](https://nodejs.org/) 22.12+, [pnpm](https://pnpm.io/installation) 12 (`corepack enable pnpm` picks the pinned version), and a TypeSafe API key from the [console](https://console.typesafe.ai). Conversions bill against that key.
 
 ```sh
 pnpm install
@@ -82,6 +82,48 @@ cp .env.example .env   # add TYPESAFE_API_KEY
 pnpm dev
 ```
 
-Open `http://localhost:5173`, pick something under **Examples**, click **Create document**. Edit the Markdown afterwards and **Apply changes** diffs it against the version that produced the document and only re-asks Jev about blocks that are new; existing `_key`s survive. The bundled schema is Sanity's admin schema, 134 document types. Paste your own descriptor JSON under **Schema** to map into it instead.
+Open `http://localhost:5173`, pick something under **Examples**, click **Create document**. Edit the Markdown afterwards and **Apply changes** diffs it against the version that produced the document and only re-asks Jev about blocks that are new; existing `_key`s survive. The bundled schema is Sanity's admin schema, 134 document types. Paste your own descriptor JSON under **Schema** to map into it instead. `pnpm test` runs offline.
 
-The engine in `src/engine/` doesn't know about the UI and runs anywhere `fetch` does. `src/sdk.ts` is a small browser client for the `/api` routes, so the key stays on the server. `pnpm test` runs offline.
+## Using it from code
+
+```sh
+pnpm add @sanity-labs/vellum
+```
+
+The package has two halves. `@sanity-labs/vellum/server` exports `handleApiRequest`, which takes a `Request` and returns a `Response`, so it mounts in any Node server built on web requests, such as a Next.js route handler or Hono. It reads `TYPESAFE_API_KEY` from the environment. Here it is in `app/api/vellum/[route]/route.ts`:
+
+```ts
+import { handleApiRequest } from '@sanity-labs/vellum/server'
+
+export const GET = handleApiRequest
+export const POST = handleApiRequest
+```
+
+`@sanity-labs/vellum` is the client. It only talks to that handler, so the key never reaches the browser.
+
+```ts
+import { createVellum } from '@sanity-labs/vellum'
+
+const vellum = createVellum({ endpoint: '/api/vellum', schema: descriptor })
+
+const result = await vellum.convertDocument(
+  { source: markdown, documentType: 'post' },
+  { onProgress: (event) => console.log(event), signal },
+)
+```
+
+`schema` is a schema descriptor, the JSON that `GET https://api.sanity.io/v1/descriptors/schemas/{id}` returns and `@sanity/schema-descriptor-utils` reads. Leave it out to map into the bundled admin schema. Leave out `documentType` and Jev picks one; if it isn't confident, `status` comes back `'needs-type'`, `document` is `null`, and `classification` lists the candidates.
+
+`result.document` has a `_type` and no `_id`, so it can go straight into `client.create()`. Check `result.validation` first: its `markers` are what `@sanity/validation` rejected. `result.confidence` holds the score for each path, and `result.warnings` includes the values that didn't clear `threshold` (0.7 unless you pass one).
+
+When the Markdown changes, send the new source with the previous result:
+
+```ts
+const next = await vellum.updateDocument({ source: editedMarkdown, previous: result })
+```
+
+Jev is only asked about blocks it hasn't seen, existing `_key`s survive, and `next.patch.mutations` holds `set`, `unset` and `insert` operations against the previous document, so an edit becomes a small patch instead of a replace.
+
+For a single rich-text field, `convertPortableText({ source, target: 'post.text' })` returns just the blocks as `value`, and `updatePortableText` does the same for edits. Targets are `documentType.field`; a `GET` to the handler's `catalog` route lists every one in the bundled schema.
+
+The handler sends no CORS headers, so serve it from the same origin as the page calling it, or call it from your backend with an absolute `endpoint`. Imports of the server entry carry the 1.8 MB admin schema that `schema` falls back to, so keep them out of browser bundles.

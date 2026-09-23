@@ -29,6 +29,7 @@ jobs:
       - run: pnpm check
       - run: pnpm knip
       - run: pnpm test
+      - run: pnpm build:pkg
       - run: pnpm build
       - name: Build for Vercel
         run: pnpm build
