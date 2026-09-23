@@ -1,4 +1,3 @@
-import { HTTPError } from 'nitro/h3'
 import { z } from 'zod'
 import { documentPatchRequest, runDocumentPatch } from '../engine/document/patch'
 import { runDocument } from '../engine/document/pipeline'
@@ -17,6 +16,8 @@ import {
 } from '../shared/contracts'
 import { streamDocument } from './stream'
 
+const httpError = z.object({ status: z.int().min(400).max(599) })
+
 function catalog(registry: SchemaRegistry, custom = false) {
   return {
     targets: registry.targets.map(registry.summarize),
@@ -30,37 +31,35 @@ function catalog(registry: SchemaRegistry, custom = false) {
 }
 
 export async function handleApiRequest(request: Request) {
-  const url = new URL(request.url)
-  if (request.method === 'GET' && url.pathname === '/api/catalog')
-    return Response.json(catalog(defaultSchema))
+  const { pathname } = new URL(request.url)
+  const route = pathname.slice(pathname.lastIndexOf('/') + 1)
+  if (request.method === 'GET' && route === 'catalog') return Response.json(catalog(defaultSchema))
   if (
     request.method === 'POST' &&
-    ['/api/document-run', '/api/document-patch', '/api/portable-text', '/api/catalog'].includes(
-      url.pathname,
-    )
+    ['document-run', 'document-patch', 'portable-text', 'catalog'].includes(route)
   ) {
     if (!request.headers.get('content-type')?.startsWith('application/json'))
       return Response.json({ error: 'Expected JSON.' }, { status: 415 })
     try {
       const raw: unknown = await request.json()
-      if (url.pathname === '/api/portable-text') {
+      if (route === 'portable-text') {
         const input = z.union([portableTextUpdateRequest, portableTextRequest]).parse(raw)
         return Response.json(await runPortableText(input, request.signal))
       }
-      if (url.pathname === '/api/catalog') {
+      if (route === 'catalog') {
         const input = z.object({ schema: schemaInput }).parse(raw)
         const registry = loadSchema(input.schema)
         if (!registry.documents.length)
           throw new Error('The schema must contain at least one document type.')
         return Response.json(catalog(registry, Boolean(input.schema)))
       }
-      if (url.pathname === '/api/document-patch') {
+      if (route === 'document-patch') {
         const input = documentPatchRequest.parse(raw)
         if (request.headers.get('accept')?.includes('text/event-stream'))
           return streamDocument(input, request.signal)
         return Response.json(await runDocumentPatch(input, request.signal))
       }
-      if (url.pathname === '/api/document-run') {
+      if (route === 'document-run') {
         const input = documentRunRequest.parse(raw)
         if (request.headers.get('accept')?.includes('text/event-stream'))
           return streamDocument(input, request.signal)
@@ -76,7 +75,7 @@ export async function handleApiRequest(request: Request) {
                 ? error.message
                 : 'The request failed.',
         },
-        { status: error instanceof HTTPError ? error.status : 400 },
+        { status: httpError.safeParse(error).data?.status ?? 400 },
       )
     }
   }
