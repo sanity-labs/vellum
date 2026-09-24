@@ -650,3 +650,75 @@ summary:focus-visible {
     min-width: 44px;
   }
 }
+
+.example-group + .example-group {
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.25rem;
+}
+
+.example-group-label {
+  padding: 0.375rem 0.75rem 0.125rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.link-button {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.schema-format {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.schema-code {
+  font-size: 0.75rem;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.zod-check {
+  margin: 1rem 1.25rem 0;
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.8125rem;
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+}
+
+.zod-check[data-status="failed"] {
+  background: color-mix(in oklab, var(--destructive) 10%, transparent);
+}
+
+.zod-check ul {
+  margin-top: 0.25rem;
+  padding-left: 1rem;
+  list-style: disc;
+}
+
+.schema-editor textarea.schema-code {
+  field-sizing: fixed;
+  width: 100%;
+  min-width: 0;
+  height: 55dvh;
+  min-height: 55dvh;
+  overflow: auto;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.editor-error {
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--destructive);
+  background: color-mix(in oklab, var(--destructive) 8%, transparent);
+  white-space: pre-wrap;
+}
