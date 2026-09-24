@@ -41,6 +41,7 @@ import { type SchemaFormat, schemaFormats, starterCode, starters } from '../sche
 import { createVellum, type DocumentOptions } from '../sdk'
 import {
   type DocumentRunResult,
+  type FieldEvidence,
   type WorkspaceCatalog,
   workspaceCatalog,
 } from '../shared/contracts'
@@ -172,6 +173,8 @@ export function App() {
   const [progress, setProgress] = useState('')
   const [panel, setPanel] = useState<'schema' | 'code' | null>(null)
   const [tab, setTab] = useState('preview')
+  const [inspected, setInspected] = useState<string>()
+  const sourceRef = useRef<HTMLTextAreaElement>(null)
   const [copied, setCopied] = useState(false)
   const controller = useRef<AbortController | null>(null)
   // Newer schema requests make older responses stale. They aren't aborted: a cancelled upload
@@ -389,6 +392,7 @@ export function App() {
         setPreviousResult(base)
       }
       abort.signal.throwIfAborted()
+      setInspected(undefined)
       setResult(next)
     } catch (error) {
       if (!abort.signal.aborted) {
@@ -402,6 +406,25 @@ export function App() {
       setUpdating(false)
       controller.current = null
     }
+  }
+
+  /** Selects the block a value was copied from in the source editor. */
+  function showInSource(evidence: FieldEvidence) {
+    const editor = sourceRef.current
+    if (!editor || !evidence.source) return
+    const { blockText, text } = evidence.source
+    let start = source.indexOf(blockText)
+    let length = blockText.length
+    if (start < 0) {
+      start = source.indexOf(text)
+      length = text.length
+    }
+    if (start < 0) return
+    editor.focus()
+    editor.setSelectionRange(start, start + length)
+    const line = source.slice(0, start).split('\n').length - 1
+    const lineHeight = Number.parseFloat(getComputedStyle(editor).lineHeight) || 20
+    editor.scrollTop = Math.max(0, line * lineHeight - editor.clientHeight / 3)
   }
 
   function download() {
@@ -737,6 +760,7 @@ export function App() {
                   ) : null}
                 </div>
                 <Textarea
+                  ref={sourceRef}
                   id="source"
                   name="source"
                   spellCheck={false}
@@ -850,7 +874,23 @@ export function App() {
                       )}
                     </div>
                     <TabsContent value="preview" className="result-content">
-                      <DocumentPreview value={result.document} confidence={result.confidence} />
+                      {result.evidence && (
+                        <p className="field-help inspect-hint">
+                          Click a field name to see where its value came from, or why it’s empty.
+                        </p>
+                      )}
+                      <DocumentPreview
+                        value={result.document}
+                        confidence={result.confidence}
+                        inspect={
+                          result.evidence && {
+                            evidence: result.evidence,
+                            selected: inspected,
+                            onSelect: setInspected,
+                            onShowSource: showInSource,
+                          }
+                        }
+                      />
                     </TabsContent>
                     <TabsContent value="json" className="result-content">
                       <pre className="json-view">{resultJson}</pre>

@@ -170,6 +170,15 @@ test('a starter maps through the pipeline and leaves an absent required value em
   expect(result.document).toMatchObject({ _type: 'product', name: 'Northwind Trail Pack 28' })
   expect(result.document).not.toHaveProperty('price')
   expect(result.errors).toContain('price: Required')
+  expect(result.evidence?.name).toMatchObject({
+    status: 'filled',
+    reason: 'copied',
+    source: { block: 'B000', text: 'Northwind Trail Pack 28' },
+  })
+  // No text in the source can be copied into a number, so Jev was never asked about price.
+  expect(result.evidence?.price).toMatchObject({ status: 'empty', reason: 'no-candidates' })
+  expect(result.evidence?.tagline).toMatchObject({ status: 'empty', reason: 'none-chosen' })
+  expect(result.evidence?.tagline?.options[0]).toMatchObject({ id: '__none__' })
 })
 
 test('toPlainJson restores the discriminator a Zod union declares, so the output parses', () => {

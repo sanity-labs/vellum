@@ -1,3 +1,4 @@
+import type { FieldEvidence } from '../../shared/contracts'
 import type { Json } from '../../shared/json'
 import { type Answer, decideInBatches, type Question } from '../jev/jev'
 import { merge } from '../jev/log'
@@ -7,9 +8,9 @@ import { type Block, type Span, spanText, tagBlocks } from './blocks'
 import type { Destination } from './destinations'
 
 export type Single = Extract<Destination, { kind: 'scalar' | 'richText' }>
-export type Binding = { destination: Single; block: Block; span: Span; value: Json; score: number }
 type Candidate = { destination: Single; block: Block; span: Span }
 type Proposal = Candidate & { assigned: number; pointed: number }
+export type Binding = Proposal & { value: Json; score: number; confirmed?: number }
 
 const agreeingSignals = 2
 const proposalProbability = 0.1
@@ -149,9 +150,74 @@ export async function confirmBindings(
       proposal.destination.schema,
       registry,
     )
-    return value === undefined ? [] : [{ ...proposal, value, score }]
+    const confirmed = answer?.type === 'noul' ? answer.noul : undefined
+    return value === undefined ? [] : [{ ...proposal, value, score, confirmed }]
   })
   return { ...merged, bindings: exclusive(bindings), notes }
+}
+
+const maxEvidenceOptions = 4
+const maxEvidenceText = 160
+
+/**
+ * Explains every single-value field: the source it was copied from, or why nothing was. This is
+ * what lets a reviewer check that no value was written by the model.
+ */
+export function explain(
+  singles: Single[],
+  spans: Candidate[],
+  pointers: Record<string, Answer>,
+  bindings: Binding[],
+): Record<string, FieldEvidence> {
+  return Object.fromEntries(
+    singles.map((destination): [string, FieldEvidence] => {
+      const offered = spans.filter((candidate) => candidate.destination === destination)
+      const pointer = pointers[`point:${destination.name}`]
+      const options =
+        pointer?.type === 'choice'
+          ? Object.entries(pointer.probabilities)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, maxEvidenceOptions)
+              .map(([id, probability]) => {
+                const candidate = offered.find((c) => c.span.id === id)
+                const text = candidate ? spanText(candidate.span, candidate.block) : ''
+                return { id, text: clip(text), probability }
+              })
+          : []
+      const binding = bindings.find((b) => b.destination === destination)
+      if (binding)
+        return [
+          destination.name,
+          {
+            status: 'filled',
+            reason: 'copied',
+            source: {
+              block: binding.block.id,
+              span: binding.span.id,
+              blockText: binding.block.text,
+              text: clip(spanText(binding.span, binding.block)),
+            },
+            signals: {
+              assigned: binding.assigned,
+              pointed: binding.pointed,
+              ...(binding.confirmed === undefined ? {} : { confirmed: binding.confirmed }),
+            },
+            options,
+          },
+        ]
+      const noneChosen = pointer?.type === 'choice' && pointer.choice === noValue
+      const reason = !offered.length
+        ? 'no-candidates'
+        : noneChosen
+          ? 'none-chosen'
+          : 'below-threshold'
+      return [destination.name, { status: 'empty', reason, options }]
+    }),
+  )
+}
+
+function clip(text: string) {
+  return text.length > maxEvidenceText ? `${text.slice(0, maxEvidenceText - 1)}…` : text
 }
 
 function strongSignals(signals: number[], threshold: number) {
