@@ -74,11 +74,11 @@ Nothing that isn't in the text gets in. Images stay as URLs, never asset referen
 
 ## Running it
 
-The hosted version at [vellum.sanity.build](https://vellum.sanity.build) needs nothing. To run your own, you need [Node.js](https://nodejs.org/) 22.12+, [pnpm](https://pnpm.io/installation) 12 (`corepack enable pnpm` picks the pinned version), and a TypeSafe API key from the [console](https://console.typesafe.ai). Conversions bill against that key.
+The hosted version at [vellum.sanity.build](https://vellum.sanity.build) needs nothing. To run your own, you need [Node.js](https://nodejs.org/) 22.12+, [pnpm](https://pnpm.io/installation) 12 (`corepack enable pnpm` picks the pinned version), and a Jev key: either a TypeSafe API key from the [console](https://console.typesafe.ai) or an [OpenRouter](https://openrouter.ai/typesafe) key, which reaches the same model. Conversions bill against that key.
 
 ```sh
 pnpm install
-cp .env.example .env   # add TYPESAFE_API_KEY
+cp .env.example .env   # add TYPESAFE_API_KEY or OPENROUTER_API_KEY
 pnpm dev
 ```
 
@@ -90,7 +90,7 @@ Open `http://localhost:5173`, pick a schema, click **Create document**. Edit the
 pnpm add @sanity-labs/vellum
 ```
 
-The package has two halves. `@sanity-labs/vellum/server` exports `handleApiRequest`, which takes a `Request` and returns a `Response`, so it mounts in any Node server built on web requests, such as a Next.js route handler or Hono. It reads `TYPESAFE_API_KEY` from the environment. Here it is in `app/api/vellum/[route]/route.ts`:
+The package has two halves. `@sanity-labs/vellum/server` exports `handleApiRequest`, which takes a `Request` and returns a `Response`, so it mounts in any Node server built on web requests, such as a Next.js route handler or Hono. It reads `TYPESAFE_API_KEY` from the environment, or `OPENROUTER_API_KEY` to reach Jev through OpenRouter (that one wins when both are set). Here it is in `app/api/vellum/[route]/route.ts`:
 
 ```ts
 import { handleApiRequest } from '@sanity-labs/vellum/server'

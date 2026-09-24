@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { documentPatchRequest, runDocumentPatch } from '../engine/document/patch'
 import { runDocument } from '../engine/document/pipeline'
 import { runPortableText } from '../engine/document/portable-text'
+import { classifierEndpoint } from '../engine/jev/jev'
 import {
   defaultSchema,
   loadSchema,
@@ -25,7 +26,7 @@ function catalog(registry: SchemaRegistry, custom = false) {
     typeCount: registry.typeCount,
     source: custom ? '' : schemaSource,
     providers: {
-      jev: Boolean(process.env.TYPESAFE_API_KEY),
+      jev: Boolean(classifierEndpoint()),
     },
   }
 }
