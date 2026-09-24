@@ -62,11 +62,30 @@ function OpenSettings() {
   return <SidebarTrigger aria-label="Open settings" title="Open settings" />
 }
 
-type Example = { label: string; group: string; choose: () => void }
+type Example = { label: string; source: string }
 
-function ExamplePicker({ disabled, examples }: { disabled: boolean; examples: Example[] }) {
+/** Samples written for Sanity's admin schema, the one schema with more than one to try. */
+const adminExamples: Example[] = [
+  { label: 'Atlas page builder', source: pageBuilderSource },
+  { label: 'Logo Soup article', source: articleSource },
+  { label: 'Media Library function', source: mediaLibrarySource },
+  { label: 'Meridian stress test', source: migrationSource },
+]
+const samples = new Set([
+  ...starters.map((starter) => starter.source),
+  ...adminExamples.map((example) => example.source),
+])
+
+function ExamplePicker({
+  disabled,
+  examples,
+  onChoose,
+}: {
+  disabled: boolean
+  examples: Example[]
+  onChoose: (source: string) => void
+}) {
   const [open, setOpen] = useState(false)
-  const groups = [...new Set(examples.map((example) => example.group))]
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -75,26 +94,19 @@ function ExamplePicker({ disabled, examples }: { disabled: boolean; examples: Ex
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-1">
-        {groups.map((group) => (
-          <div key={group} className="example-group">
-            <p className="example-group-label">{group}</p>
-            {examples
-              .filter((example) => example.group === group)
-              .map((example) => (
-                <Button
-                  key={example.label}
-                  type="button"
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    example.choose()
-                    setOpen(false)
-                  }}
-                >
-                  {example.label}
-                </Button>
-              ))}
-          </div>
+        {examples.map((example) => (
+          <Button
+            key={example.label}
+            type="button"
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => {
+              onChoose(example.source)
+              setOpen(false)
+            }}
+          >
+            {example.label}
+          </Button>
         ))}
       </PopoverContent>
     </Popover>
@@ -166,6 +178,7 @@ export function App() {
   // surfaces as a server error in development, and catalog requests are cheap.
   const catalogRequest = useRef(0)
   const busy = running || applyingSchema
+  const currentStarter = starters.find((starter) => starter.id === schemaChoice.id)
   const previewType =
     running && !updating ? resolvedType : result?.status === 'mapped' ? result.documentType : null
   // biome-ignore lint/correctness/useExhaustiveDependencies: load the default starter once
@@ -457,8 +470,13 @@ export function App() {
                   onChange={(value) => {
                     if (value === 'custom') setPanel('schema')
                     else if (value === 'admin')
-                      void applySchema(undefined, { id: 'admin', kind: 'descriptor', unmapped: [] })
-                    else void switchStarter(value, schemaFormat, false)
+                      void applySchema(
+                        undefined,
+                        { id: 'admin', kind: 'descriptor', unmapped: [] },
+                        samples.has(source) ? { source: adminExamples[0].source } : {},
+                      )
+                    // Bring the starter's sample along, unless the source is the person's own.
+                    else void switchStarter(value, schemaFormat, samples.has(source))
                   }}
                 />
                 {starters.some((starter) => starter.id === schemaChoice.id) && (
@@ -631,27 +649,29 @@ export function App() {
                   </DialogContent>
                 </Dialog>
               </Field>
-              <Field data-disabled={busy || !catalog}>
-                <FieldLabel htmlFor="target">Document type</FieldLabel>
-                <SearchPicker
-                  id="target"
-                  label="Document type"
-                  value={documentType}
-                  disabled={busy || !catalog}
-                  placeholder="Loading schema…"
-                  options={[
-                    { value: 'auto', label: 'Choose automatically' },
-                    ...(catalog?.documents.map((item) => ({
-                      value: item.name,
-                      label: item.title,
-                      description: item.name,
-                    })) ?? []),
-                  ]}
-                  onChange={(value) => {
-                    setDocumentType(value)
-                  }}
-                />
-              </Field>
+              {(catalog?.documents.length ?? 0) > 1 && (
+                <Field data-disabled={busy || !catalog}>
+                  <FieldLabel htmlFor="target">Document type</FieldLabel>
+                  <SearchPicker
+                    id="target"
+                    label="Document type"
+                    value={documentType}
+                    disabled={busy || !catalog}
+                    placeholder="Loading schema…"
+                    options={[
+                      { value: 'auto', label: 'Choose automatically' },
+                      ...(catalog?.documents.map((item) => ({
+                        value: item.name,
+                        label: item.title,
+                        description: item.name,
+                      })) ?? []),
+                    ]}
+                    onChange={(value) => {
+                      setDocumentType(value)
+                    }}
+                  />
+                </Field>
+              )}
               <details className="advanced-settings">
                 <summary>
                   More options
@@ -702,31 +722,19 @@ export function App() {
                       Source
                     </label>
                   </div>
-                  <ExamplePicker
-                    disabled={busy}
-                    examples={[
-                      ...starters.map((starter) => ({
-                        label: starter.title,
-                        group: 'Starter schemas',
-                        choose: () => void switchStarter(starter.id, schemaFormat),
-                      })),
-                      ...[
-                        { label: 'Atlas page builder', source: pageBuilderSource },
-                        { label: 'Logo Soup article', source: articleSource },
-                        { label: 'Media Library function', source: mediaLibrarySource },
-                        { label: 'Meridian stress test', source: migrationSource },
-                      ].map((example) => ({
-                        label: example.label,
-                        group: 'Sanity.io admin schema',
-                        choose: () =>
-                          void applySchema(
-                            undefined,
-                            { id: 'admin', kind: 'descriptor', unmapped: [] },
-                            { source: example.source },
-                          ),
-                      })),
-                    ]}
-                  />
+                  {schemaChoice.id === 'admin' ? (
+                    <ExamplePicker disabled={busy} examples={adminExamples} onChoose={setSource} />
+                  ) : currentStarter ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy || source === currentStarter.source}
+                      onClick={() => setSource(currentStarter.source)}
+                    >
+                      Load sample
+                    </Button>
+                  ) : null}
                 </div>
                 <Textarea
                   id="source"
