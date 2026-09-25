@@ -37,21 +37,33 @@ const initialBackoffMs = 500
 const requestTimeoutMs = 30000
 const maxInFlight = 16
 
+/**
+ * Where Jev is reached. OpenRouter serves the same System One API, billed to an OpenRouter key,
+ * and wins when both keys are set.
+ */
+export function classifierEndpoint() {
+  if (process.env.OPENROUTER_API_KEY)
+    return { url: 'https://openrouter.ai/api/v1/systemone', key: process.env.OPENROUTER_API_KEY }
+  if (process.env.TYPESAFE_API_KEY)
+    return { url: 'https://api.typesafe.ai/v1/systemone', key: process.env.TYPESAFE_API_KEY }
+  return undefined
+}
+
 export async function decide(
   input: { state: Json; questions: Record<string, Question> },
   signal: AbortSignal,
 ): Promise<Decision> {
-  const key = process.env.TYPESAFE_API_KEY
-  if (!key)
+  const endpoint = classifierEndpoint()
+  if (!endpoint)
     throw new Error('Classification is unavailable. Configure the classifier key on the server.')
   const body = JSON.stringify({ model: 'jev-latest', ...input })
   for (let attempt = 1; ; attempt++) {
     signal.throwIfAborted()
     const response = await inFlight(() =>
-      fetch('https://api.typesafe.ai/v1/systemone', {
+      fetch(endpoint.url, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${key}`,
+          Authorization: `Bearer ${endpoint.key}`,
           'Content-Type': 'application/json',
         },
         body,

@@ -1,4 +1,4 @@
-import type { DocumentProgress } from '../../shared/contracts'
+import type { DocumentProgress, FieldEvidence } from '../../shared/contracts'
 import type { JsonObject } from '../../shared/json'
 import { type Answer, decideInBatches, type Question } from '../jev/jev'
 import { type Answers, createLog, type Log, merge, windows } from '../jev/log'
@@ -8,6 +8,7 @@ import {
   candidates,
   confirmBindings,
   describePart,
+  explain,
   isSingle,
   noValue,
   pointAtSpans,
@@ -54,9 +55,11 @@ export type MappingInput = {
   threshold: number
 }
 type Confidence = Record<string, number>
-type Mapped = { fields: JsonObject; confidence: Confidence; notes: string[] }
+type Evidence = Record<string, FieldEvidence>
+type Mapped = { fields: JsonObject; confidence: Confidence; evidence: Evidence; notes: string[] }
 type Bound = {
   bindings: Binding[]
+  evidence: Evidence
   assignments: Record<string, Answer>
   notes: string[]
 }
@@ -77,6 +80,7 @@ export async function mapBlocks(
   return {
     document: { _type: typeName, ...mapped.fields } as JsonObject,
     confidence: mapped.confidence,
+    evidence: mapped.evidence,
     notes: summarizeUnconsumed(mapped.notes),
     trace: scope.log.trace,
     decisions: scope.log.decisions,
@@ -140,7 +144,7 @@ async function mapObject(
   const { log, path, signal } = scope
   const destinations = scope.catalog.of(schema)
   const streams = destinations.filter(isStream)
-  const [{ bindings, assignments, notes }, segmented] = await Promise.all([
+  const [{ bindings, assignments, evidence, notes }, segmented] = await Promise.all([
     bindSingles(blocks, blocks, destinations, title, scope, depth),
     log.step(`Segment (${title})`, path, () =>
       segment(blocks, streams.filter(isCollection), signal),
@@ -171,10 +175,11 @@ async function mapObject(
       const collection = await mapCollection(group, stream, scope, depth + 1)
       if (collection.items.length) fields[stream.name] = collection.items
       Object.assign(confidence, collection.confidence)
+      Object.assign(evidence, collection.evidence)
       notes.push(...collection.notes)
     } else notes.push(`Nesting too deep for ${stream.name}`)
   }
-  return { fields, confidence, notes }
+  return { fields, confidence, evidence, notes }
 }
 
 async function bindSingles(
@@ -187,7 +192,8 @@ async function bindSingles(
 ): Promise<Bound> {
   const { registry, log, signal, path } = scope
   const own = ownBlocks(blocks).filter((block) => targets.includes(block))
-  const spans = candidates(own, destinations.filter(isSingle), registry)
+  const singles = destinations.filter(isSingle)
+  const spans = candidates(own, singles, registry)
   const [assignments, pointers] = await Promise.all([
     log.step(`Assign blocks (${title})`, path, () =>
       assignBlocks(blocks, targets, destinations, title, depth, signal),
@@ -202,6 +208,7 @@ async function bindSingles(
   )
   return {
     bindings: confirmed.bindings,
+    evidence: explain(singles, spans, pointers.answers, confirmed.bindings),
     assignments: assignments.answers,
     notes: [...pointers.notes, ...confirmed.notes],
   }
@@ -212,7 +219,7 @@ async function mapCollection(
   stream: Collection,
   scope: Scope,
   depth: number,
-): Promise<{ items: JsonObject[]; confidence: Confidence; notes: string[] }> {
+): Promise<{ items: JsonObject[]; confidence: Confidence; evidence: Evidence; notes: string[] }> {
   const { path } = scope
   scope.onProgress?.({ type: 'progress', message: `Mapping ${stream.title}…` })
   const notes: string[] = []
@@ -236,15 +243,18 @@ async function mapCollection(
     }),
   )
   const confidence: Confidence = {}
+  const evidence: Evidence = {}
   const items = mapped
     .filter((best) => best !== undefined)
     .map((best, index) => {
       notes.push(...best.item.notes)
       for (const [field, score] of Object.entries(best.item.confidence))
         confidence[`${stream.name}[${index}].${field}`] = score
+      for (const [field, why] of Object.entries(best.item.evidence))
+        evidence[`${stream.name}[${index}].${field}`] = why
       return { _type: best.member.name, ...best.item.fields }
     })
-  return { items, confidence, notes }
+  return { items, confidence, evidence, notes }
 }
 
 function unconsumedCount(notes: string[]) {

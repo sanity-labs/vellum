@@ -17,6 +17,8 @@ const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/
 const slugPattern = /^\/?[\p{L}\p{N}_-]+(?:\/[\p{L}\p{N}_-]+)*\/?$/u
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const relativeUrlPattern = /^[/#?][^\s]*$/
+// URL.canParse accepts any scheme, so a labeled line like "Venue: Oslo" would count as a URL.
+const webUrlPattern = /^(?:https?:\/\/[^\s]+|mailto:[^\s]+|tel:[^\s]+)$/i
 
 export function coerceFieldValue(
   raw: string,
@@ -32,7 +34,7 @@ export function coerceFieldValue(
     case 'slug':
       return slugPattern.test(value) ? value.replace(/^\//, '').replace(/\/$/, '') : undefined
     case 'url':
-      return URL.canParse(value) || relativeUrlPattern.test(value) ? value : undefined
+      return webUrlPattern.test(value) || relativeUrlPattern.test(value) ? value : undefined
     case 'email':
       return emailPattern.test(value) ? value : undefined
     case 'date':
