@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import atlasSource from '../examples/atlas-brief.md?raw'
 import blogPostSource from '../examples/starters/blog-post.md?raw'
 import eventSource from '../examples/starters/event.md?raw'
 import jobSource from '../examples/starters/job-posting.md?raw'
+import landingPageSource from '../examples/starters/landing-page.md?raw'
 import productSource from '../examples/starters/product.md?raw'
 import recipeSource from '../examples/starters/recipe.md?raw'
 import { type CompiledSchema, compileSchemaCode, type SchemaFormat } from './code'
@@ -76,7 +76,7 @@ export const starters: Starter[] = [
     id: 'landing-page',
     title: 'Landing page',
     description: 'Hero, features, cards, quote, FAQ, call to action',
-    source: atlasSource,
+    source: landingPageSource,
     code: { sanity: landingPageSanity, zod: landingPageZod },
   },
 ]

@@ -13,7 +13,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Sidebar,
   SidebarContent,
@@ -29,10 +28,6 @@ import { Toaster } from '@/components/ui/sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import pageBuilderSource from '../examples/atlas-brief.md?raw'
-import articleSource from '../examples/logo-soup.md?raw'
-import mediaLibrarySource from '../examples/media-library-asset-function.md?raw'
-import migrationSource from '../examples/migration-launch.md?raw'
 import jobPostingSource from '../examples/starters/job-posting.md?raw'
 import jsonSchemaExample from '../examples/starters/job-posting.schema.json?raw'
 import { compileSchemaCode } from '../schema/code'
@@ -64,56 +59,7 @@ function OpenSettings() {
   return <SidebarTrigger aria-label="Open settings" title="Open settings" />
 }
 
-type Example = { label: string; source: string }
-
-/** Samples written for Sanity's admin schema, the one schema with more than one to try. */
-const adminExamples: Example[] = [
-  { label: 'Atlas page builder', source: pageBuilderSource },
-  { label: 'Logo Soup article', source: articleSource },
-  { label: 'Media Library function', source: mediaLibrarySource },
-  { label: 'Meridian stress test', source: migrationSource },
-]
-const samples = new Set([
-  ...starters.map((starter) => starter.source),
-  ...adminExamples.map((example) => example.source),
-])
-
-function ExamplePicker({
-  disabled,
-  examples,
-  onChoose,
-}: {
-  disabled: boolean
-  examples: Example[]
-  onChoose: (source: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" disabled={disabled}>
-          Examples <ChevronDown />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 p-1">
-        {examples.map((example) => (
-          <Button
-            key={example.label}
-            type="button"
-            variant="ghost"
-            className="w-full justify-start"
-            onClick={() => {
-              onChoose(example.source)
-              setOpen(false)
-            }}
-          >
-            {example.label}
-          </Button>
-        ))}
-      </PopoverContent>
-    </Popover>
-  )
-}
+const samples = new Set(starters.map((starter) => starter.source))
 
 const defaultStarter = starters[0]
 
@@ -125,7 +71,7 @@ function sanityUrl(placement: 'sidebar' | 'result') {
   return url.toString()
 }
 type SchemaChoice = {
-  /** A starter id, `admin` for the bundled schema, or `custom` for a pasted one. */
+  /** A starter id, or `custom` for a pasted schema. */
   id: string
   kind: 'descriptor' | 'json-schema'
   unmapped: string[]
@@ -487,12 +433,6 @@ export function App() {
                       group: 'Starters',
                     })),
                     {
-                      value: 'admin',
-                      label: 'Sanity.io admin schema',
-                      description: '134 types, the schema behind sanity.io',
-                      group: 'More',
-                    },
-                    {
                       value: 'custom',
                       label: 'Your own schema…',
                       description: 'Paste JSON Schema, Zod output, or a Sanity descriptor',
@@ -501,12 +441,6 @@ export function App() {
                   ]}
                   onChange={(value) => {
                     if (value === 'custom') setPanel('schema')
-                    else if (value === 'admin')
-                      void applySchema(
-                        undefined,
-                        { id: 'admin', kind: 'descriptor', unmapped: [] },
-                        samples.has(source) ? { source: adminExamples[0].source } : {},
-                      )
                     // Bring the starter's sample along, unless the source is the person's own.
                     else void switchStarter(value, schemaFormat, samples.has(source))
                   }}
@@ -634,12 +568,8 @@ export function App() {
                           <strong>JSON Schema:</strong> an object with <code>properties</code>. From
                           Zod, paste the output of <code>z.toJSONSchema(schema)</code>. Mark rich
                           text with <code>format: &quot;markdown&quot;</code>.{' '}
-                          <strong>Sanity descriptor:</strong> JSON with a <code>types</code> object,
-                          like{' '}
-                          <a href={catalog?.source} target="_blank" rel="noreferrer">
-                            admin-schema.json
-                          </a>
-                          .
+                          <strong>Sanity descriptor:</strong> the JSON with a <code>types</code>{' '}
+                          object that Sanity's schema descriptor API returns for a deployed Studio.
                         </p>
                         <Textarea
                           id="schema"
@@ -767,9 +697,7 @@ export function App() {
                       Source
                     </label>
                   </div>
-                  {schemaChoice.id === 'admin' ? (
-                    <ExamplePicker disabled={busy} examples={adminExamples} onChoose={setSource} />
-                  ) : currentStarter ? (
+                  {currentStarter && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -779,7 +707,7 @@ export function App() {
                     >
                       Load sample
                     </Button>
-                  ) : null}
+                  )}
                 </div>
                 <Textarea
                   ref={sourceRef}
