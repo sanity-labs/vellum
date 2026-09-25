@@ -17,8 +17,8 @@ A stretch pocket on the front holds a wet jacket. Two side pockets fit a litre b
 
 ## Specifications
 
-Volume: 28 litres
-Weight: 980 g
-Fabric: 210D recycled ripstop nylon
-Back length: 44–52 cm, adjustable
-Warranty: Lifetime
+- **Volume:** 28 litres
+- **Weight:** 980 g
+- **Fabric:** 210D recycled ripstop nylon
+- **Back length:** 44–52 cm, adjustable
+- **Warranty:** Lifetime

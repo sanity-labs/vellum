@@ -17,9 +17,17 @@ Two talks from teams who rebuilt their content model in the last year, then an o
 
 ## Speakers
 
-- **Ingrid Solberg**, Staff Engineer at Vy
-- **Tomás Rivera**, Content Designer at Posten
-- **Mari Kjelstad**, Developer Advocate at Sanity
+Name: Ingrid Solberg
+Role: Staff Engineer
+Company: Vy
+
+Name: Tomás Rivera
+Role: Content Designer
+Company: Posten
+
+Name: Mari Kjelstad
+Role: Developer Advocate
+Company: Sanity
 
 ## Agenda
 

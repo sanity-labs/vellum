@@ -9,9 +9,7 @@ export const Product = z
     inStock: z.boolean().optional(),
     tagline: z.string().optional().describe('A short line under the name.'),
     description: z.string().meta({ format: 'markdown' }).optional(),
-    specs: z
-      .array(z.object({ label: z.string(), value: z.string() }).meta({ title: 'Spec' }))
-      .optional(),
+    specs: z.string().meta({ format: 'markdown' }).optional(),
     buyUrl: z.url().optional(),
   })
   .meta({ title: 'Product' })

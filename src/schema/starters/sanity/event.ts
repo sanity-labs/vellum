@@ -33,19 +33,6 @@ export const event = defineType({
         },
       ],
     },
-    {
-      name: 'agenda',
-      type: 'array',
-      of: [
-        {
-          type: 'object',
-          name: 'session',
-          fields: [
-            { name: 'time', type: 'string' },
-            { name: 'title', type: 'string', validation: required },
-          ],
-        },
-      ],
-    },
+    { name: 'agenda', ...richText },
   ],
 })

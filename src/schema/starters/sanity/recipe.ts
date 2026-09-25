@@ -8,8 +8,8 @@ export const recipe = defineType({
     { name: 'title', type: 'string', validation: required },
     { name: 'description', type: 'text' },
     { name: 'servings', type: 'number', validation: (rule) => rule.min(1) },
-    { name: 'prepMinutes', title: 'Prep time (minutes)', type: 'number' },
-    { name: 'cookMinutes', title: 'Cook time (minutes)', type: 'number' },
+    { name: 'prepTime', title: 'Prep time', type: 'string' },
+    { name: 'cookTime', title: 'Cook time', type: 'string' },
     {
       name: 'difficulty',
       type: 'string',

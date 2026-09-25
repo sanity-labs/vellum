@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import atlasSource from '../examples/atlas-brief.md?raw'
-import logoSoupSource from '../examples/logo-soup.md?raw'
+import blogPostSource from '../examples/starters/blog-post.md?raw'
 import eventSource from '../examples/starters/event.md?raw'
 import jobSource from '../examples/starters/job-posting.md?raw'
 import productSource from '../examples/starters/product.md?raw'
@@ -41,7 +41,7 @@ export const starters: Starter[] = [
     id: 'blog-post',
     title: 'Blog post',
     description: 'Title, excerpt, author, category, body',
-    source: logoSoupSource,
+    source: blogPostSource,
     code: { sanity: blogPostSanity, zod: blogPostZod },
   },
   {

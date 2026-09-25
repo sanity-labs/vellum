@@ -12,22 +12,7 @@ export const product = defineType({
     { name: 'inStock', title: 'In stock', type: 'boolean' },
     { name: 'tagline', type: 'string', description: 'A short line under the name.' },
     { name: 'description', ...richText },
-    {
-      name: 'specs',
-      title: 'Specifications',
-      type: 'array',
-      of: [
-        {
-          type: 'object',
-          name: 'spec',
-          title: 'Specification',
-          fields: [
-            { name: 'label', type: 'string', validation: required },
-            { name: 'value', type: 'string', validation: required },
-          ],
-        },
-      ],
-    },
+    { name: 'specs', title: 'Specifications', ...richText },
     { name: 'buyUrl', title: 'Buy URL', type: 'url' },
   ],
 })

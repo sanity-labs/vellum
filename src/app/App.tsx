@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarInset,
   SidebarProvider,
@@ -115,6 +116,14 @@ function ExamplePicker({
 }
 
 const defaultStarter = starters[0]
+
+function sanityUrl(placement: 'sidebar' | 'result') {
+  const url = new URL('https://www.sanity.io/get-started')
+  url.searchParams.set('utm_source', 'vellum')
+  url.searchParams.set('utm_medium', 'referral')
+  url.searchParams.set('utm_content', placement)
+  return url.toString()
+}
 type SchemaChoice = {
   /** A starter id, `admin` for the bundled schema, or `custom` for a pasted one. */
   id: string
@@ -727,6 +736,19 @@ export function App() {
               </details>
             </FieldGroup>
           </SidebarContent>
+          <SidebarFooter className="made-by">
+            <p className="made-by-title">Made by Sanity</p>
+            <p>
+              Vellum is an experiment. Sanity is the content platform it maps into: typed schemas,
+              validated documents, and an API for every front end.
+            </p>
+            <a className="made-by-cta" href={sanityUrl('sidebar')} target="_blank" rel="noreferrer">
+              Start a free Sanity project <ArrowRight aria-hidden="true" className="size-3.5" />
+            </a>
+            <a href="https://github.com/sanity-labs/vellum" target="_blank" rel="noreferrer">
+              Vellum on GitHub
+            </a>
+          </SidebarFooter>
           <SidebarRail
             aria-label="Collapse settings"
             title="Collapse settings"
@@ -974,6 +996,12 @@ export function App() {
                         )}
                       </span>
                       <div className="flex items-center gap-1">
+                        <Button asChild variant="ghost" size="sm">
+                          <a href={sanityUrl('result')} target="_blank" rel="noreferrer">
+                            Put this in Sanity{' '}
+                            <ArrowRight data-icon="inline-end" aria-hidden="true" />
+                          </a>
+                        </Button>
                         {previousResult && (
                           <Button
                             type="button"
@@ -1018,7 +1046,16 @@ export function App() {
                           />
                         </div>
                       ) : (
-                        'Your structured document will appear here.'
+                        <div className="empty-intro">
+                          <p>
+                            Click <strong>Create document</strong> to map the source into this
+                            schema.
+                          </p>
+                          <p>
+                            Jev, a classifier, only picks which part of the source fills each field.
+                            Code copies it. Anything the source doesn’t supply stays empty.
+                          </p>
+                        </div>
                       )}
                     </div>
                   </>

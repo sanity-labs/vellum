@@ -1,11 +1,16 @@
-import { memo } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { z } from 'zod'
 import { contentNode, type FieldEvidence } from '../shared/contracts'
 import type { Json } from '../shared/json'
 import { Preview } from './Preview'
 
+/** Field names in sentence case: `publishedAt` reads as "Published at". */
 function label(name: string) {
-  return name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ')
+  const words = name
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]/g, ' ')
+    .toLowerCase()
+  return words.charAt(0).toUpperCase() + words.slice(1)
 }
 type Confidence = Record<string, number>
 type Evidence = Record<string, FieldEvidence>
@@ -158,8 +163,12 @@ function EvidenceCard({
   onShowSource: () => void
 }) {
   const picked = evidence.source?.span ?? (evidence.reason === 'none-chosen' ? noValue : undefined)
+  const card = useRef<HTMLElement>(null)
+  useEffect(() => {
+    card.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [])
   return (
-    <section className="evidence" aria-label={`Where ${label(name)} came from`}>
+    <section ref={card} className="evidence" aria-label={`Where ${label(name)} came from`}>
       <p className="evidence-summary">{summary(name, evidence)}</p>
       {evidence.source && (
         <blockquote className="evidence-source">

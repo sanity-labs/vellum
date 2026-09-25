@@ -803,3 +803,37 @@ summary:focus-visible {
 .evidence-signals {
   color: var(--muted-foreground);
 }
+
+.made-by {
+  gap: 0.5rem;
+  border-top: 1px solid var(--border);
+  padding: 1rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.made-by-title {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.made-by a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.made-by a.made-by-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.empty-intro {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 22rem;
+  text-align: center;
+}

@@ -3,8 +3,8 @@
 A rich, meaty-tasting pasta sauce with no meat in it. Most of the time is hands-off simmering.
 
 Serves: 4
-Prep: 15 minutes
-Cook: 40 minutes
+Prep time: 15 minutes
+Cook time: 40 minutes
 Difficulty: Easy
 Cuisine: Italian
 

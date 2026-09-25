@@ -18,10 +18,6 @@ export const Event = z
           .meta({ title: 'Speaker' }),
       )
       .optional(),
-    agenda: z
-      .array(
-        z.object({ time: z.string().optional(), title: z.string() }).meta({ title: 'Session' }),
-      )
-      .optional(),
+    agenda: z.string().meta({ format: 'markdown' }).optional(),
   })
   .meta({ title: 'Event' })
