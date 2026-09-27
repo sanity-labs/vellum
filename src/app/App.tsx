@@ -981,7 +981,7 @@ export function App() {
                             schema.
                           </p>
                           <p>
-                            <a href="https://typesafe.ai" target="_blank" rel="noreferrer">
+                            <a href="https://typesafe.ai" target="_blank" rel="noopener">
                               Jev
                             </a>
                             , TypeSafe’s classifier, only picks which part of the source fills each
