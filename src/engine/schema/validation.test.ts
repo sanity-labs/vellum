@@ -104,6 +104,7 @@ test('uses Sanity rules, severity, and keyed paths without adding system fields 
     ]),
   )
   expect(document).not.toHaveProperty('_id')
+  expect(result.errors.some((error) => error.startsWith('items[0].count: '))).toBe(true)
 })
 
 test('accepts real array choices and reports unavailable serialized custom or composed rules', async () => {
@@ -132,4 +133,29 @@ test('accepts real array choices and reports unavailable serialized custom or co
     expect(validation.status).toBe('notEvaluated')
     expect(validation.warnings.join(' ')).toContain(type)
   }
+})
+
+test('a missing required value reports Required once, not every rule on its path', async () => {
+  const registry = createSchema({
+    types: {
+      product: {
+        extends: 'document',
+        fields: [
+          {
+            name: 'price',
+            typeDef: {
+              extends: 'number',
+              validation: [{ rules: [{ type: 'required' }, { type: 'minimum', value: '0' }] }],
+            },
+          },
+        ],
+      },
+    },
+  })
+  const result = await validateMappedDocument(
+    { _type: 'product' },
+    registry,
+    new AbortController().signal,
+  )
+  expect(result.errors).toEqual(['price: Required'])
 })

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "The role, as it should appear in listings"
+    },
+    "team": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string"
+    },
+    "workplace": {
+      "type": "string",
+      "enum": ["Remote", "Hybrid", "On-site"]
+    },
+    "employmentType": {
+      "type": "string",
+      "enum": ["Full-time", "Part-time", "Contract", "Internship"]
+    },
+    "salaryMin": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "salaryMax": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "applyUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "intro": {
+      "description": "The pitch paragraph before the lists",
+      "type": "string",
+      "maxLength": 400
+    },
+    "responsibilities": {
+      "type": "string",
+      "format": "markdown"
+    },
+    "requirements": {
+      "type": "string",
+      "format": "markdown"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["title", "applyUrl"],
+  "additionalProperties": false,
+  "title": "Job posting"
+}

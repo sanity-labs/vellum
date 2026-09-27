@@ -59,6 +59,29 @@ export const sourceBaseline = z.object({
   source: z.string().trim().max(40000),
   version: z.string().regex(/^[a-f0-9]{64}$/),
 })
+const evidenceOption = z.object({
+  /** A span id, or `__none__` for "nothing here supplies this field". */
+  id: z.string(),
+  text: z.string(),
+  probability: z.number(),
+})
+/** Why a field holds its value, or why it's empty. */
+const fieldEvidence = z.object({
+  status: z.enum(['filled', 'empty']),
+  reason: z.enum(['copied', 'below-threshold', 'none-chosen', 'no-candidates']),
+  /** The source block the value was copied from, and the exact text copied. */
+  source: z
+    .object({ block: z.string(), span: z.string(), blockText: z.string(), text: z.string() })
+    .optional(),
+  /** The three signals: field → part, part → field, and the pairing check when it was asked. */
+  signals: z
+    .object({ assigned: z.number(), pointed: z.number(), confirmed: z.number().optional() })
+    .optional(),
+  /** The answer to "which part of the source supplies this field?", most likely first. */
+  options: z.array(evidenceOption).default([]),
+})
+export type FieldEvidence = z.infer<typeof fieldEvidence>
+
 export const documentRunResponse = z.object({
   sourceBaseline: sourceBaseline.optional(),
   patch: z
@@ -85,6 +108,7 @@ export const documentRunResponse = z.object({
   status: z.enum(['mapped', 'needs-type']),
   document: z.record(z.string(), z.json()).nullable(),
   confidence: z.record(z.string(), z.number()).optional(),
+  evidence: z.record(z.string(), fieldEvidence).optional(),
   documentType: documentSummary.nullable(),
   classification: z
     .object({

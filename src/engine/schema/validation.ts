@@ -77,14 +77,19 @@ export async function validateMappedDocument(
     schema,
     signal,
   })
-  const markers = result.markers.map(({ code, level, message, path }) => ({
-    code,
-    level,
-    message,
-    path,
-  }))
+  // A missing value fails every rule on its path; "Required" is the only one worth reading.
+  const missing = new Set(
+    result.markers
+      .filter((marker) => marker.code === 'value.required')
+      .map((marker) => JSON.stringify(marker.path)),
+  )
+  const markers = result.markers
+    .filter(
+      (marker) => marker.code === 'value.required' || !missing.has(JSON.stringify(marker.path)),
+    )
+    .map(({ code, level, message, path }) => ({ code, level, message, path }))
   const format = (marker: (typeof markers)[number]) =>
-    `${marker.path.map((segment) => (typeof segment === 'object' && '_key' in segment ? `[_key="${segment._key}"]` : String(segment))).join('.') || document._type}: ${marker.message}`
+    `${readablePath(document, marker.path) || document._type}: ${marker.message}`
   return {
     status:
       unavailable.length && result.status === 'passed' ? ('notEvaluated' as const) : result.status,
@@ -102,4 +107,30 @@ export async function validateMappedDocument(
         : []),
     ],
   }
+}
+
+/** Writes `['items', { _key: 'a1b2' }, 'title']` as `items[0].title`, which a reader can find. */
+function readablePath(document: JsonObject, path: unknown[]) {
+  let value: unknown = document
+  let text = ''
+  for (const segment of path) {
+    if (segment && typeof segment === 'object' && '_key' in segment) {
+      const items = Array.isArray(value) ? value : []
+      const index = items.findIndex(
+        (item) => item && typeof item === 'object' && item._key === segment._key,
+      )
+      text += index >= 0 ? `[${index}]` : `[_key="${String(segment._key)}"]`
+      value = items[index]
+    } else if (typeof segment === 'number') {
+      text += `[${segment}]`
+      value = Array.isArray(value) ? value[segment] : undefined
+    } else {
+      text += text ? `.${String(segment)}` : String(segment)
+      value =
+        value && typeof value === 'object'
+          ? (value as Record<string, unknown>)[String(segment)]
+          : undefined
+    }
+  }
+  return text
 }

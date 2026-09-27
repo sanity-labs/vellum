@@ -22,6 +22,7 @@ export type Mapper = (
 ) => Promise<{
   document: NonNullable<DocumentRunResult['document']>
   confidence: Record<string, number>
+  evidence?: DocumentRunResult['evidence']
   notes: string[]
   trace: DocumentRunResult['trace']
 }>
@@ -111,6 +112,7 @@ export async function runDocument(
     documentType,
     classification,
     confidence: mapped.confidence,
+    evidence: mapped.evidence,
     validation: { status: validation.status, markers: validation.markers },
     trace,
     warnings: [...new Set([...mapped.notes, ...materialized.warnings, ...validation.warnings])],

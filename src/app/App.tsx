@@ -1,13 +1,4 @@
-import {
-  ArrowRight,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  FileJson,
-  LoaderCircle,
-  RotateCw,
-} from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, Copy, LoaderCircle, RotateCw } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -20,13 +11,12 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarInset,
   SidebarProvider,
@@ -38,17 +28,20 @@ import { Toaster } from '@/components/ui/sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import pageBuilderSource from '../examples/atlas-brief.md?raw'
-import articleSource from '../examples/logo-soup.md?raw'
-import mediaLibrarySource from '../examples/media-library-asset-function.md?raw'
-import migrationSource from '../examples/migration-launch.md?raw'
+import jobPostingSource from '../examples/starters/job-posting.md?raw'
+import jsonSchemaExample from '../examples/starters/job-posting.schema.json?raw'
+import { compileSchemaCode } from '../schema/code'
+import { isJsonSchema, type JsonSchema, typesFromJsonSchema } from '../schema/json-schema'
+import { toPlainJson } from '../schema/plain'
+import { type SchemaFormat, schemaFormats, starterCode, starters } from '../schema/starters'
 import { createVellum, type DocumentOptions } from '../sdk'
 import {
   type DocumentRunResult,
+  type FieldEvidence,
   type WorkspaceCatalog,
   workspaceCatalog,
 } from '../shared/contracts'
-import { documentVersion } from '../shared/json'
+import { documentVersion, type JsonObject } from '../shared/json'
 import { DocumentPreview } from './DocumentPreview'
 
 async function readResponse<T>(response: Response, schema: z.ZodType<T>) {
@@ -66,54 +59,46 @@ function OpenSettings() {
   return <SidebarTrigger aria-label="Open settings" title="Open settings" />
 }
 
-function ExamplePicker({
-  disabled,
-  onChoose,
-}: {
-  disabled: boolean
-  onChoose: (source: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" disabled={disabled}>
-          Examples <ChevronDown />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 p-1">
-        {[
-          { label: 'Atlas page builder', source: pageBuilderSource },
-          { label: 'Logo Soup article', source: articleSource },
-          { label: 'Media Library function', source: mediaLibrarySource },
-          { label: 'Meridian stress test', source: migrationSource },
-        ].map((example) => (
-          <Button
-            key={example.label}
-            type="button"
-            variant="ghost"
-            className="w-full justify-start"
-            onClick={() => {
-              onChoose(example.source)
-              setOpen(false)
-            }}
-          >
-            {example.label}
-          </Button>
-        ))}
-      </PopoverContent>
-    </Popover>
-  )
+const samples = new Set(starters.map((starter) => starter.source))
+
+const defaultStarter = starters[0]
+
+function sanityUrl(placement: 'sidebar' | 'result') {
+  const url = new URL('https://www.sanity.io/get-started')
+  url.searchParams.set('utm_source', 'vellum')
+  url.searchParams.set('utm_medium', 'referral')
+  url.searchParams.set('utm_content', placement)
+  return url.toString()
+}
+type SchemaChoice = {
+  /** A starter id, or `custom` for a pasted schema. */
+  id: string
+  kind: 'descriptor' | 'json-schema'
+  unmapped: string[]
+  /** The JSON Schema the types came from, which shapes the plain JSON output. */
+  jsonSchema?: JsonSchema
+  /** The Zod schema a starter was written in, to check the plain JSON output against. */
+  zod?: z.ZodType
 }
 
 export function App() {
   const [catalog, setCatalog] = useState<WorkspaceCatalog>()
   const [documentType, setDocumentType] = useState('auto')
-  const [source, setSource] = useState(pageBuilderSource)
+  const [source, setSource] = useState(defaultStarter.source)
   const [threshold, setThreshold] = useState(0.7)
   const [result, setResult] = useState<DocumentRunResult>()
   const [activeSchema, setActiveSchema] = useState<string>()
   const [schemaDraft, setSchemaDraft] = useState('')
+  const [schemaChoice, setSchemaChoice] = useState<SchemaChoice>({
+    id: defaultStarter.id,
+    kind: 'descriptor',
+    unmapped: [],
+  })
+  const [schemaFormat, setSchemaFormat] = useState<SchemaFormat>('sanity')
+  /** Edited starter code, keyed by `starterId:format`, so switching formats keeps edits. */
+  const [schemaEdits, setSchemaEdits] = useState<Record<string, string>>({})
+  const [editorDraft, setEditorDraft] = useState('')
+  const [editorError, setEditorError] = useState('')
   const [applyingSchema, setApplyingSchema] = useState(false)
   const [running, setRunning] = useState(false)
   const [updating, setUpdating] = useState(false)
@@ -122,6 +107,18 @@ export function App() {
     () => (result?.document ? JSON.stringify(result.document, null, 2) : ''),
     [result?.document],
   )
+  const plain = useMemo(
+    () =>
+      result?.document
+        ? toPlainJson(result.document as JsonObject, schemaChoice.jsonSchema)
+        : undefined,
+    [result?.document, schemaChoice.jsonSchema],
+  )
+  const plainJson = useMemo(() => (plain ? JSON.stringify(plain, null, 2) : ''), [plain])
+  const zodCheck = useMemo(
+    () => (plain && schemaChoice.zod ? schemaChoice.zod.safeParse(plain) : undefined),
+    [plain, schemaChoice.zod],
+  )
   const resultRef = useRef(result)
   resultRef.current = result
   const [resolvedType, setResolvedType] = useState<{
@@ -129,72 +126,179 @@ export function App() {
     title: string
   } | null>(null)
   const [progress, setProgress] = useState('')
-  const [panel, setPanel] = useState<'schema' | null>(null)
+  const [panel, setPanel] = useState<'schema' | 'code' | null>(null)
   const [tab, setTab] = useState('preview')
+  const [inspected, setInspected] = useState<string>()
+  const sourceRef = useRef<HTMLTextAreaElement>(null)
   const [copied, setCopied] = useState(false)
   const controller = useRef<AbortController | null>(null)
-  const catalogController = useRef<AbortController | null>(null)
+  // Newer schema requests make older responses stale. They aren't aborted: a cancelled upload
+  // surfaces as a server error in development, and catalog requests are cheap.
+  const catalogRequest = useRef(0)
   const busy = running || applyingSchema
+  const currentStarter = starters.find((starter) => starter.id === schemaChoice.id)
   const previewType =
     running && !updating ? resolvedType : result?.status === 'mapped' ? result.documentType : null
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load the default starter once
   useEffect(() => {
-    const abort = new AbortController()
-    catalogController.current = abort
-    fetch('/api/catalog', { signal: abort.signal })
-      .then((response) => readResponse(response, workspaceCatalog))
-      .then((next) => {
-        if (!abort.signal.aborted) {
-          setCatalog(next)
-        }
-      })
-      .catch((error: unknown) => {
-        if (!abort.signal.aborted)
-          toast.error('Unable to load the schema', {
-            description: error instanceof Error ? error.message : 'Please try again.',
-            id: 'schema-error',
-          })
-      })
+    void switchStarter(defaultStarter.id, 'sanity')
     return () => {
-      abort.abort()
       controller.current?.abort()
-      catalogController.current?.abort()
+      catalogRequest.current += 1
     }
   }, [])
 
-  async function applySchema(schema?: string, exampleSource?: string) {
+  async function applySchema(
+    schema: string | undefined,
+    choice: SchemaChoice,
+    next: { source?: string; documentType?: string; draft?: string } = {},
+  ) {
     toast.dismiss('schema-error')
-    catalogController.current?.abort()
-    const abort = new AbortController()
-    catalogController.current = abort
+    const request = ++catalogRequest.current
+    const stale = () => request !== catalogRequest.current
     setApplyingSchema(true)
     try {
       const response = await fetch('/api/catalog', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schema }),
-        signal: abort.signal,
       })
       const nextCatalog = await readResponse(response, workspaceCatalog)
-      if (abort.signal.aborted) return
+      if (stale()) return
       setCatalog(nextCatalog)
       setPreviousResult(undefined)
       setActiveSchema(schema)
-      setSchemaDraft(schema ?? '')
-      setDocumentType('auto')
+      setSchemaChoice(choice)
+      if (next.draft !== undefined) setSchemaDraft(next.draft)
+      setDocumentType(next.documentType ?? 'auto')
       setResult(undefined)
-      setPanel(null)
-      if (exampleSource !== undefined) {
-        setSource(exampleSource)
-      }
+      setTab(choice.kind === 'json-schema' ? 'plain' : 'preview')
+      setPanel((open) => (open === 'schema' ? null : open))
+      if (next.source !== undefined) setSource(next.source)
+      if (choice.unmapped.length)
+        toast.warning('Some fields can’t be filled from Markdown yet', {
+          description: choice.unmapped.join(', '),
+          id: 'schema-unmapped',
+        })
     } catch (error) {
-      if (abort.signal.aborted) return
+      if (stale()) return
       toast.error('Unable to load the schema', {
         description: error instanceof Error ? error.message : 'Please try again.',
         id: 'schema-error',
       })
       setPanel('schema')
     } finally {
-      setApplyingSchema(false)
+      if (!stale()) setApplyingSchema(false)
+    }
+  }
+
+  async function chooseStarter(
+    id: string,
+    format: SchemaFormat,
+    options: { withSource?: boolean; code?: string } = {},
+  ) {
+    const starter = starters.find((item) => item.id === id)
+    if (!starter) return
+    const code = options.code ?? schemaEdits[`${id}:${format}`] ?? starterCode(starter, format)
+    const schema = compileSchemaCode(format, code)
+    const { descriptorFromTypes } = await import('../schema/descriptor')
+    const descriptor = await descriptorFromTypes(schema.types)
+    await applySchema(
+      JSON.stringify(descriptor),
+      {
+        id,
+        kind: format === 'sanity' ? 'descriptor' : 'json-schema',
+        unmapped: schema.unmapped,
+        jsonSchema: schema.jsonSchema,
+        zod: schema.zod,
+      },
+      {
+        source: options.withSource === false ? undefined : starter.source,
+        documentType: schema.documentType,
+      },
+    )
+    setSchemaFormat(format)
+  }
+
+  async function switchStarter(id: string, format: SchemaFormat, withSource = true) {
+    try {
+      await chooseStarter(id, format, { withSource })
+    } catch (error) {
+      setSchemaFormat(schemaFormat)
+      toast.error('Unable to load the starter', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+        id: 'schema-error',
+      })
+    }
+  }
+
+  function openEditor() {
+    const starter = starters.find((item) => item.id === schemaChoice.id)
+    if (!starter) return
+    setEditorDraft(
+      schemaEdits[`${starter.id}:${schemaFormat}`] ?? starterCode(starter, schemaFormat),
+    )
+    setEditorError('')
+    setPanel('code')
+  }
+
+  async function resetEditor() {
+    const starter = starters.find((item) => item.id === schemaChoice.id)
+    if (!starter) return
+    const key = `${starter.id}:${schemaFormat}`
+    const code = starterCode(starter, schemaFormat)
+    setEditorDraft(code)
+    try {
+      await chooseStarter(starter.id, schemaFormat, { withSource: false, code })
+      setSchemaEdits(({ [key]: _reset, ...edits }) => edits)
+      setEditorError('')
+    } catch (error) {
+      setEditorError(error instanceof Error ? error.message : 'The schema could not be compiled.')
+    }
+  }
+
+  async function applyEditor(code: string) {
+    const key = `${schemaChoice.id}:${schemaFormat}`
+    try {
+      await chooseStarter(schemaChoice.id, schemaFormat, { withSource: false, code })
+      setSchemaEdits((edits) => ({ ...edits, [key]: code }))
+      setEditorError('')
+      setPanel(null)
+    } catch (error) {
+      setEditorError(error instanceof Error ? error.message : 'The schema could not be compiled.')
+    }
+  }
+
+  async function applyPastedSchema(text: string) {
+    try {
+      let raw: unknown
+      try {
+        raw = JSON.parse(text)
+      } catch {
+        throw new Error('The schema is not valid JSON. Check its commas and brackets.')
+      }
+      if (!isJsonSchema(raw)) {
+        await applySchema(text, { id: 'custom', kind: 'descriptor', unmapped: [] }, { draft: text })
+        return
+      }
+      const conversion = typesFromJsonSchema(raw)
+      const { descriptorFromTypes } = await import('../schema/descriptor')
+      const descriptor = await descriptorFromTypes(conversion.types)
+      await applySchema(
+        JSON.stringify(descriptor),
+        {
+          id: 'custom',
+          kind: 'json-schema',
+          unmapped: conversion.unmapped,
+          jsonSchema: raw,
+        },
+        { draft: text, documentType: conversion.documentType },
+      )
+    } catch (error) {
+      toast.error('Unable to use this schema', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+        id: 'schema-error',
+      })
     }
   }
 
@@ -243,6 +347,7 @@ export function App() {
         setPreviousResult(base)
       }
       abort.signal.throwIfAborted()
+      setInspected(undefined)
       setResult(next)
     } catch (error) {
       if (!abort.signal.aborted) {
@@ -258,6 +363,25 @@ export function App() {
     }
   }
 
+  /** Selects the block a value was copied from in the source editor. */
+  function showInSource(evidence: FieldEvidence) {
+    const editor = sourceRef.current
+    if (!editor || !evidence.source) return
+    const { blockText, text } = evidence.source
+    let start = source.indexOf(blockText)
+    let length = blockText.length
+    if (start < 0) {
+      start = source.indexOf(text)
+      length = text.length
+    }
+    if (start < 0) return
+    editor.focus()
+    editor.setSelectionRange(start, start + length)
+    const line = source.slice(0, start).split('\n').length - 1
+    const lineHeight = Number.parseFloat(getComputedStyle(editor).lineHeight) || 20
+    editor.scrollTop = Math.max(0, line * lineHeight - editor.clientHeight / 3)
+  }
+
   function download() {
     if (!result?.document) return
     const url = URL.createObjectURL(new Blob([resultJson], { type: 'application/json' }))
@@ -271,7 +395,7 @@ export function App() {
   async function copy() {
     if (!result?.document) return
     try {
-      await navigator.clipboard.writeText(resultJson)
+      await navigator.clipboard.writeText(tab === 'plain' ? plainJson : resultJson)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     } catch {
@@ -294,77 +418,158 @@ export function App() {
           </SidebarHeader>
           <SidebarContent className="settings-content">
             <FieldGroup>
-              <Field data-disabled={busy || !catalog}>
-                <FieldLabel htmlFor="target">Document type</FieldLabel>
+              <Field className="schema-setting" data-disabled={busy}>
+                <FieldLabel htmlFor="schema-picker">Schema</FieldLabel>
                 <SearchPicker
-                  id="target"
-                  label="Document type"
-                  value={documentType}
-                  disabled={busy || !catalog}
-                  placeholder="Loading schema…"
+                  id="schema-picker"
+                  label="Schema"
+                  value={schemaChoice.id}
+                  disabled={busy}
                   options={[
-                    { value: 'auto', label: 'Choose automatically' },
-                    ...(catalog?.documents.map((item) => ({
-                      value: item.name,
-                      label: item.title,
-                      description: item.name,
-                    })) ?? []),
+                    ...starters.map((starter) => ({
+                      value: starter.id,
+                      label: starter.title,
+                      description: starter.description,
+                      group: 'Starters',
+                    })),
+                    {
+                      value: 'custom',
+                      label: 'Your own schema…',
+                      description: 'Paste JSON Schema, Zod output, or a Sanity descriptor',
+                      group: 'More',
+                    },
                   ]}
                   onChange={(value) => {
-                    setDocumentType(value)
+                    if (value === 'custom') setPanel('schema')
+                    // Bring the starter's sample along, unless the source is the person's own.
+                    else void switchStarter(value, schemaFormat, samples.has(source))
                   }}
                 />
-              </Field>
-              <Field className="schema-setting">
-                <FieldLabel htmlFor="schema-picker">Schema</FieldLabel>
+                {starters.some((starter) => starter.id === schemaChoice.id) && (
+                  <div className="schema-format">
+                    <Tabs
+                      value={schemaFormat}
+                      onValueChange={(value) => {
+                        // Radix reports a change on both mousedown and focus; act on it once.
+                        if (value === schemaFormat) return
+                        setSchemaFormat(value as SchemaFormat)
+                        void switchStarter(schemaChoice.id, value as SchemaFormat, false)
+                      }}
+                    >
+                      <TabsList className="w-full">
+                        {schemaFormats.map((format) => (
+                          <TabsTrigger key={format.value} value={format.value} disabled={busy}>
+                            {format.label}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    </Tabs>
+                    <span>
+                      <button type="button" className="link-button" onClick={openEditor}>
+                        Edit schema
+                      </button>
+                      {schemaEdits[`${schemaChoice.id}:${schemaFormat}`] !== undefined && (
+                        <span className="text-muted-foreground"> · edited</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+                <Dialog
+                  open={panel === 'code'}
+                  onOpenChange={(open) => setPanel(open ? 'code' : null)}
+                >
+                  <DialogContent className="schema-dialog max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {starters.find((starter) => starter.id === schemaChoice.id)?.title} as{' '}
+                        {schemaFormats.find((format) => format.value === schemaFormat)?.label}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {schemaFormat === 'sanity'
+                          ? 'A Studio schema type. Vellum compiles it into a schema descriptor in your browser.'
+                          : schemaFormat === 'zod'
+                            ? 'Vellum reads it through z.toJSONSchema(), then checks the plain JSON output against it.'
+                            : 'Starts as what z.toJSONSchema() makes of the Zod version. Mark rich text with "format": "markdown".'}{' '}
+                        {schemaFormat !== 'json-schema' &&
+                          'It runs as plain JavaScript, so leave out type annotations.'}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="schema-editor">
+                      <Textarea
+                        aria-label="Schema code"
+                        className="schema-code"
+                        value={editorDraft}
+                        onChange={(event) => setEditorDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey))
+                            void applyEditor(editorDraft)
+                        }}
+                        spellCheck={false}
+                        disabled={busy}
+                      />
+                      {editorError && (
+                        <p className="editor-error" role="alert">
+                          {editorError}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          disabled={busy || !editorDraft.trim()}
+                          onClick={() => applyEditor(editorDraft)}
+                        >
+                          {applyingSchema ? 'Compiling…' : 'Apply schema'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy}
+                          onClick={resetEditor}
+                        >
+                          Reset to starter
+                        </Button>
+                        <span className="text-xs text-muted-foreground">⌘↵ to apply</span>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <p id="schema-count" className="field-help">
+                  {schemaChoice.id === 'custom'
+                    ? `${schemaChoice.kind === 'json-schema' ? 'From JSON Schema' : 'Pasted descriptor'}, ${catalog?.documents.length ?? 0} document ${catalog?.documents.length === 1 ? 'type' : 'types'}. `
+                    : null}
+                  {schemaChoice.unmapped.length > 0 &&
+                    `Can’t fill yet: ${schemaChoice.unmapped.join(', ')}. `}
+                  {schemaChoice.id === 'custom' && (
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={() => setPanel('schema')}
+                    >
+                      Edit schema
+                    </button>
+                  )}
+                </p>
                 <Dialog
                   open={panel === 'schema'}
                   onOpenChange={(open) => setPanel(open ? 'schema' : null)}
                 >
-                  <DialogTrigger asChild>
-                    <Button
-                      type="button"
-                      id="schema-picker"
-                      variant="ghost"
-                      className="schema-summary"
-                      aria-describedby="schema-count"
-                      disabled={busy}
-                    >
-                      <FileJson aria-hidden="true" className="text-muted-foreground" />
-                      <span className="schema-summary-text">
-                        <span>{activeSchema ? 'Custom schema' : 'admin-schema.json'}</span>
-                        <span id="schema-count" className="schema-count">
-                          {catalog?.documents.length ?? 0} document types
-                        </span>
-                      </span>
-                      <ChevronRight aria-hidden="true" className="text-muted-foreground" />
-                    </Button>
-                  </DialogTrigger>
                   <DialogContent className="schema-dialog max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
                     <DialogHeader>
-                      <DialogTitle>Schema</DialogTitle>
+                      <DialogTitle>Your own schema</DialogTitle>
                       <DialogDescription>
-                        Use the bundled schema or paste your own.
+                        Paste a JSON Schema or a Sanity schema descriptor.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="schema-editor">
-                      <p className="field-help">
-                        Using{' '}
-                        {activeSchema ? (
-                          'your pasted schema'
-                        ) : (
-                          <a href={catalog?.source} target="_blank" rel="noreferrer">
-                            admin-schema.json
-                          </a>
-                        )}{' '}
-                        with {catalog?.documents.length ?? 0} document types.
-                      </p>
                       <Field>
-                        <FieldLabel htmlFor="schema">Paste a schema descriptor</FieldLabel>
+                        <FieldLabel htmlFor="schema">Schema JSON</FieldLabel>
                         <p className="field-help">
-                          JSON with a <code>types</code> object and optional <code>hoisted</code>{' '}
-                          definitions, like the bundled schema. JavaScript schema files are not
-                          supported yet.
+                          <strong>JSON Schema:</strong> an object with <code>properties</code>. From
+                          Zod, paste the output of <code>z.toJSONSchema(schema)</code>. Mark rich
+                          text with <code>format: &quot;markdown&quot;</code>.{' '}
+                          <strong>Sanity descriptor:</strong> the JSON with a <code>types</code>{' '}
+                          object that Sanity's schema descriptor API returns for a deployed Studio.
                         </p>
                         <Textarea
                           id="schema"
@@ -377,7 +582,7 @@ export function App() {
                           disabled={busy}
                           spellCheck={false}
                           placeholder={
-                            '{ "types": { "page": { "extends": "document", "fields": […] } } }'
+                            '{ "type": "object", "title": "Job posting", "properties": { "title": { "type": "string" } } }'
                           }
                         />
                       </Field>
@@ -385,7 +590,7 @@ export function App() {
                         <Button
                           type="button"
                           disabled={busy || !schemaDraft.trim()}
-                          onClick={() => applySchema(schemaDraft)}
+                          onClick={() => applyPastedSchema(schemaDraft)}
                         >
                           {applyingSchema ? 'Checking schema…' : 'Use this schema'}
                         </Button>
@@ -394,15 +599,41 @@ export function App() {
                           variant="ghost"
                           size="sm"
                           disabled={busy}
-                          onClick={() => applySchema()}
+                          onClick={() => {
+                            setSchemaDraft(jsonSchemaExample)
+                            setSource(jobPostingSource)
+                          }}
                         >
-                          Use bundled schema
+                          Try a JSON Schema example
                         </Button>
                       </div>
                     </div>
                   </DialogContent>
                 </Dialog>
               </Field>
+              {(catalog?.documents.length ?? 0) > 1 && (
+                <Field data-disabled={busy || !catalog}>
+                  <FieldLabel htmlFor="target">Document type</FieldLabel>
+                  <SearchPicker
+                    id="target"
+                    label="Document type"
+                    value={documentType}
+                    disabled={busy || !catalog}
+                    placeholder="Loading schema…"
+                    options={[
+                      { value: 'auto', label: 'Choose automatically' },
+                      ...(catalog?.documents.map((item) => ({
+                        value: item.name,
+                        label: item.title,
+                        description: item.name,
+                      })) ?? []),
+                    ]}
+                    onChange={(value) => {
+                      setDocumentType(value)
+                    }}
+                  />
+                </Field>
+              )}
               <details className="advanced-settings">
                 <summary>
                   More options
@@ -435,6 +666,19 @@ export function App() {
               </details>
             </FieldGroup>
           </SidebarContent>
+          <SidebarFooter className="made-by">
+            <p className="made-by-title">Made by Sanity</p>
+            <p>
+              Vellum is an experiment. Sanity is the content platform it maps into: typed schemas,
+              validated documents, and an API for every front end.
+            </p>
+            <a className="made-by-cta" href={sanityUrl('sidebar')} target="_blank" rel="noreferrer">
+              Start a free Sanity project <ArrowRight aria-hidden="true" className="size-3.5" />
+            </a>
+            <a href="https://github.com/sanity-labs/vellum" target="_blank" rel="noreferrer">
+              Vellum on GitHub
+            </a>
+          </SidebarFooter>
           <SidebarRail
             aria-label="Collapse settings"
             title="Collapse settings"
@@ -453,12 +697,20 @@ export function App() {
                       Source
                     </label>
                   </div>
-                  <ExamplePicker
-                    disabled={busy}
-                    onChoose={(source) => applySchema(undefined, source)}
-                  />
+                  {currentStarter && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy || source === currentStarter.source}
+                      onClick={() => setSource(currentStarter.source)}
+                    >
+                      Load sample
+                    </Button>
+                  )}
                 </div>
                 <Textarea
+                  ref={sourceRef}
                   id="source"
                   name="source"
                   spellCheck={false}
@@ -540,7 +792,8 @@ export function App() {
                     <div className="panel-header result-toolbar">
                       <TabsList variant="line">
                         <TabsTrigger value="preview">Fields</TabsTrigger>
-                        <TabsTrigger value="json">JSON</TabsTrigger>
+                        <TabsTrigger value="json">Sanity JSON</TabsTrigger>
+                        <TabsTrigger value="plain">Plain JSON</TabsTrigger>
                         <TabsTrigger value="validation">
                           Validation
                           {result.errors.length > 0 && (
@@ -557,7 +810,7 @@ export function App() {
                           )}
                         </TabsTrigger>
                       </TabsList>
-                      {tab === 'json' && (
+                      {(tab === 'json' || tab === 'plain') && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -571,10 +824,51 @@ export function App() {
                       )}
                     </div>
                     <TabsContent value="preview" className="result-content">
-                      <DocumentPreview value={result.document} confidence={result.confidence} />
+                      {result.evidence && (
+                        <p className="field-help inspect-hint">
+                          Click a field name to see where its value came from, or why it’s empty.
+                        </p>
+                      )}
+                      <DocumentPreview
+                        value={result.document}
+                        confidence={result.confidence}
+                        inspect={
+                          result.evidence && {
+                            evidence: result.evidence,
+                            selected: inspected,
+                            onSelect: setInspected,
+                            onShowSource: showInSource,
+                          }
+                        }
+                      />
                     </TabsContent>
                     <TabsContent value="json" className="result-content">
                       <pre className="json-view">{resultJson}</pre>
+                    </TabsContent>
+                    <TabsContent value="plain" className="result-content">
+                      {zodCheck && (
+                        <div
+                          className="zod-check"
+                          data-status={zodCheck.success ? 'passed' : 'failed'}
+                          role="status"
+                        >
+                          {zodCheck.success ? (
+                            'Passes the Zod schema.'
+                          ) : (
+                            <>
+                              <p>Fails the Zod schema. Nothing was invented to make it pass:</p>
+                              <ul>
+                                {zodCheck.error.issues.map((issue) => (
+                                  <li key={`${issue.path.join('.')}:${issue.message}`}>
+                                    <code>{issue.path.join('.') || '(root)'}</code>: {issue.message}
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <pre className="json-view">{plainJson}</pre>
                     </TabsContent>
                     <TabsContent value="validation" className="result-content">
                       <div className="validation-content">
@@ -630,6 +924,12 @@ export function App() {
                         )}
                       </span>
                       <div className="flex items-center gap-1">
+                        <Button asChild variant="ghost" size="sm">
+                          <a href={sanityUrl('result')} target="_blank" rel="noreferrer">
+                            Put this in Sanity{' '}
+                            <ArrowRight data-icon="inline-end" aria-hidden="true" />
+                          </a>
+                        </Button>
                         {previousResult && (
                           <Button
                             type="button"
@@ -674,7 +974,16 @@ export function App() {
                           />
                         </div>
                       ) : (
-                        'Your structured document will appear here.'
+                        <div className="empty-intro">
+                          <p>
+                            Click <strong>Create document</strong> to map the source into this
+                            schema.
+                          </p>
+                          <p>
+                            Jev, a classifier, only picks which part of the source fills each field.
+                            Code copies it. Anything the source doesn’t supply stays empty.
+                          </p>
+                        </div>
                       )}
                     </div>
                   </>
