@@ -981,8 +981,11 @@ export function App() {
                             schema.
                           </p>
                           <p>
-                            Jev, a classifier, only picks which part of the source fills each field.
-                            Code copies it. Anything the source doesn’t supply stays empty.
+                            <a href="https://typesafe.ai" target="_blank" rel="noreferrer">
+                              Jev
+                            </a>
+                            , TypeSafe’s classifier, only picks which part of the source fills each
+                            field. Code copies it. Anything the source doesn’t supply stays empty.
                           </p>
                         </div>
                       )}

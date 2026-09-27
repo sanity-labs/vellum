@@ -837,3 +837,8 @@ summary:focus-visible {
   max-width: 22rem;
   text-align: center;
 }
+
+.empty-intro a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
