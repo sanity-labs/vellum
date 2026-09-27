@@ -669,8 +669,9 @@ export function App() {
           <SidebarFooter className="made-by">
             <p className="made-by-title">Made by Sanity</p>
             <p>
-              Vellum is an experiment. Sanity is the content platform it maps into: typed schemas,
-              validated documents, and an API for every front end.
+              Vellum is a Sanity experiment in turning loose text into structured content. Sanity is
+              the AI Content Operating System, where that structure works for your teams, your
+              automations, and your agents.
             </p>
             <a className="made-by-cta" href={sanityUrl('sidebar')} target="_blank" rel="noreferrer">
               Start a free Sanity project <ArrowRight aria-hidden="true" className="size-3.5" />
