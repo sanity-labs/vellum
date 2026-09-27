@@ -1,6 +1,6 @@
 # Vellum
 
-Paste this into [vellum.sanity.build](https://vellum.sanity.build):
+Paste this into [vellum.sanity.dev](https://vellum.sanity.dev):
 
 ```markdown
 # The logo soup problem
@@ -74,7 +74,7 @@ Nothing that isn't in the text gets in. Images stay as URLs, never asset referen
 
 ## Running it
 
-The hosted version at [vellum.sanity.build](https://vellum.sanity.build) needs nothing. To run your own, you need [Node.js](https://nodejs.org/) 22.12+, [pnpm](https://pnpm.io/installation) 12 (`corepack enable pnpm` picks the pinned version), and a Jev key: either a TypeSafe API key from the [console](https://console.typesafe.ai) or an [OpenRouter](https://openrouter.ai/typesafe) key, which reaches the same model. Conversions bill against that key.
+The hosted version at [vellum.sanity.dev](https://vellum.sanity.dev) needs nothing. To run your own, you need [Node.js](https://nodejs.org/) 22.12+, [pnpm](https://pnpm.io/installation) 12 (`corepack enable pnpm` picks the pinned version), and a Jev key: either a TypeSafe API key from the [console](https://console.typesafe.ai) or an [OpenRouter](https://openrouter.ai/typesafe) key, which reaches the same model. Conversions bill against that key.
 
 ```sh
 pnpm install
