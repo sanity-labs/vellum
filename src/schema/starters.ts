@@ -40,7 +40,7 @@ export const starters: Starter[] = [
   {
     id: 'blog-post',
     title: 'Blog post',
-    description: 'Title, excerpt, author, category, body',
+    description: 'Title, excerpt, author, category, tags, body',
     source: blogPostSource,
     code: { sanity: blogPostSanity, zod: blogPostZod },
   },

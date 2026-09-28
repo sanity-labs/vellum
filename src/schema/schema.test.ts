@@ -69,7 +69,7 @@ const Job = z
 test('a Zod schema converts through JSON Schema into a document type', async () => {
   const { types, documentType, unmapped } = typesFromJsonSchema(z.toJSONSchema(Job))
   expect(documentType).toBe('jobPosting')
-  expect(unmapped).toEqual(['tags (array of string values)'])
+  expect(unmapped).toEqual([])
   const registry = createSchema(await descriptorFromTypes(types))
   const fields = registry.getDocument('jobPosting').fields
   expect(Object.fromEntries(fields.map((field) => [field.name, field.type]))).toEqual({
@@ -86,6 +86,15 @@ test('a Zod schema converts through JSON Schema into a document type', async () 
   expect(
     registry.choices(registry.field(registry.getDocument('jobPosting').schema, 'workplace')),
   ).toEqual(['Remote', 'Hybrid', 'On-site'])
+})
+
+test('only arrays that mix plain values with other members are left unmapped', () => {
+  const { unmapped } = typesFromJsonSchema(
+    z.toJSONSchema(
+      z.object({ values: z.array(z.union([z.string(), z.object({ id: z.string() })])) }),
+    ),
+  )
+  expect(unmapped).toEqual(['values (array of mixed values)'])
 })
 
 test('required JSON Schema properties become required Sanity fields', async () => {
@@ -180,6 +189,31 @@ test('a starter maps through the pipeline and leaves an absent required value em
   expect(result.evidence?.tagline).toMatchObject({ status: 'empty', reason: 'none-chosen' })
   expect(result.evidence?.tagline?.options[0]).toMatchObject({ id: '__none__' })
 })
+
+test.each(['sanity', 'zod'] as const)(
+  'the blog post starter fills its tags from one comma-separated line (%s)',
+  async (format) => {
+    const starter = starters.find((item) => item.id === 'blog-post')
+    if (!starter) throw new Error('Missing blog post starter')
+    const schema = starterSchema(starter, format)
+    fakeJev({ assign: { B000: ['title'], 'B004.value': ['tags'] } })
+    const result = await runDocument(
+      {
+        source: starter.source,
+        schema: JSON.stringify(await descriptorFromTypes(schema.types)),
+        documentType: schema.documentType,
+        threshold: 0.7,
+      },
+      new AbortController().signal,
+    )
+    expect(result.document?.tags).toEqual(['React', 'Open source', 'Image processing'])
+    expect(result.evidence?.tags).toMatchObject({
+      status: 'filled',
+      source: { span: 'B004.value', text: 'React, Open source, Image processing' },
+    })
+    expect(result.errors.some((error) => error.startsWith('tags'))).toBe(false)
+  },
+)
 
 test('toPlainJson restores the discriminator a Zod union declares, so the output parses', () => {
   const starter = starters.find((item) => item.id === 'landing-page')

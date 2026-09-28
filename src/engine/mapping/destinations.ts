@@ -1,5 +1,5 @@
 import { decide, type NoulQuestion } from '../jev/jev'
-import { scalarTypes } from '../schema/coerce'
+import { listItemSchema, scalarTypes } from '../schema/coerce'
 import type { SchemaNode, SchemaRegistry } from '../schema/registry'
 
 export type Member = {
@@ -84,6 +84,9 @@ function describeFields(registry: SchemaRegistry, schema: SchemaNode): Destinati
       return [{ ...base, kind: 'richText', type: 'rich text', arity: 'many' }]
     if (scalarTypes.has(field.typeDef.extends))
       return [{ ...base, kind: 'scalar', type: field.typeDef.extends }]
+    // A list of plain values is filled from one span, like a scalar: "Tags: Design, React".
+    const item = listItemSchema(field.typeDef, registry)
+    if (item) return [{ ...base, kind: 'scalar', type: `list of ${item.extends}` }]
     if (field.typeDef.extends !== 'array') return []
     const members = listMembers(registry, field.typeDef)
     return members.length ? [{ ...base, kind: 'collection', type: 'array', members }] : []

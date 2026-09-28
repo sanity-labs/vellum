@@ -19,6 +19,21 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const relativeUrlPattern = /^[/#?][^\s]*$/
 // URL.canParse accepts any scheme, so a labeled line like "Venue: Oslo" would count as a URL.
 const webUrlPattern = /^(?:https?:\/\/[^\s]+|mailto:[^\s]+|tel:[^\s]+)$/i
+const listSeparator = /[,;]/
+
+/** The item type of an array of plain values, like tags, or undefined for any other array. */
+export function listItemSchema(schema: SchemaNode, registry: SchemaRegistry) {
+  const resolved = registry.resolveType(schema)
+  if (resolved.extends !== 'array') return undefined
+  const members = registry.members(resolved)
+  if (members.length !== 1 || !scalarTypes.has(members[0].typeDef.extends)) return undefined
+  const item = members[0].typeDef
+  // Studio keeps predefined values for a list on the array; JSON Schema keeps them on the item.
+  const list = resolved.options?.list
+  return list?.length && !item.options?.list?.length
+    ? { ...item, options: { ...item.options, list } }
+    : item
+}
 
 export function coerceFieldValue(
   raw: string,
@@ -26,6 +41,8 @@ export function coerceFieldValue(
   registry: SchemaRegistry,
 ): Json | undefined {
   const value = raw.trim()
+  const item = listItemSchema(schema, registry)
+  if (item) return coerceList(value, item, registry)
   switch (schema.extends) {
     case 'boolean':
       return /^(true|false)$/i.test(value) ? value.toLowerCase() === 'true' : undefined
@@ -43,6 +60,17 @@ export function coerceFieldValue(
   }
   if (!registry.choices(schema).length) return value
   return matchOption(value, schema)
+}
+
+/** A list is one line of values split on commas or semicolons, each one valid for the item type. */
+function coerceList(value: string, item: SchemaNode, registry: SchemaRegistry) {
+  if (value.includes('\n')) return undefined
+  const parts = value
+    .split(listSeparator)
+    .map((part) => part.trim())
+    .filter(Boolean)
+  const items = parts.map((part) => coerceFieldValue(part, item, registry))
+  return items.length && !items.includes(undefined) ? (items as Json[]) : undefined
 }
 
 function matchOption(value: string, schema: SchemaNode): Json | undefined {

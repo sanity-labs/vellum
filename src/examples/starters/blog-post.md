@@ -3,6 +3,7 @@
 Author: Rostislav Melkumyan
 Published: 2026-02-05T18:00:00Z
 Category: Design
+Tags: React, Open source, Image processing
 
 Why do logo clouds always look like a ransom note? A deep dive into the math behind making mismatched brand logos actually look good together. And a tiny React library that does it for you.
 
