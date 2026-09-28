@@ -625,6 +625,14 @@ summary:focus-visible {
   .panel-footer {
     height: 70px;
   }
+  .result-footer {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 70px;
+  }
+  .result-actions {
+    flex-wrap: wrap;
+  }
   .schema-dialog {
     padding: 20px;
   }

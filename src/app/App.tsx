@@ -42,6 +42,7 @@ import {
   workspaceCatalog,
 } from '../shared/contracts'
 import { documentVersion, type JsonObject } from '../shared/json'
+import { type AgentPromptInput, agentPrompt } from './agent-prompt'
 import { DocumentPreview } from './DocumentPreview'
 
 async function readResponse<T>(response: Response, schema: z.ZodType<T>) {
@@ -131,6 +132,7 @@ export function App() {
   const [inspected, setInspected] = useState<string>()
   const sourceRef = useRef<HTMLTextAreaElement>(null)
   const [copied, setCopied] = useState(false)
+  const [promptCopied, setPromptCopied] = useState(false)
   const controller = useRef<AbortController | null>(null)
   // Newer schema requests make older responses stale. They aren't aborted: a cancelled upload
   // surfaces as a server error in development, and catalog requests are cheap.
@@ -318,6 +320,7 @@ export function App() {
       setPreviousResult(undefined)
     }
     setCopied(false)
+    setPromptCopied(false)
     try {
       const vellum = createVellum({ endpoint: '/api', schema: activeSchema })
       const options: DocumentOptions = {
@@ -400,6 +403,41 @@ export function App() {
       setTimeout(() => setCopied(false), 1800)
     } catch {
       toast.error('Clipboard access was unavailable', { description: 'Use Download JSON instead.' })
+    }
+  }
+
+  /** The schema the result was mapped with, as the person wrote or pasted it. */
+  function schemaSource(): AgentPromptInput['schema'] {
+    if (currentStarter)
+      return {
+        format: schemaFormat,
+        code:
+          schemaEdits[`${currentStarter.id}:${schemaFormat}`] ??
+          starterCode(currentStarter, schemaFormat),
+      }
+    // A pasted descriptor is machine JSON, often megabytes; the prompt lists its fields instead.
+    if (schemaChoice.kind === 'json-schema') return { format: 'json-schema', code: schemaDraft }
+  }
+
+  async function copyPrompt() {
+    if (!result?.document || !result.documentType) return
+    const prompt = agentPrompt({
+      document: result.document as JsonObject,
+      documentType: result.documentType,
+      schema: schemaSource(),
+      errors: result.errors,
+    })
+    try {
+      await navigator.clipboard.writeText(prompt)
+      setPromptCopied(true)
+      setTimeout(() => setPromptCopied(false), 1800)
+      toast.success('Prompt copied', {
+        description:
+          'Paste it into a coding agent like Claude Code or Cursor. It sets up a Sanity project with sanity.new, no account needed, and adds this document.',
+        id: 'agent-prompt',
+      })
+    } catch {
+      toast.error('Clipboard access was unavailable', { description: 'Please try again.' })
     }
   }
 
@@ -924,7 +962,22 @@ export function App() {
                           `${result.documentType?.name} in ${(result.elapsedMs / 1000).toFixed(2)}s${result.patch ? `, ${result.patch.edits} ${result.patch.edits === 1 ? 'change' : 'changes'}` : ''}`
                         )}
                       </span>
-                      <div className="flex items-center gap-1">
+                      <div className="result-actions flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy}
+                          onClick={copyPrompt}
+                          title="Copy a prompt that has a coding agent set up a Sanity project with sanity.new and add this document"
+                        >
+                          {promptCopied ? (
+                            <Check data-icon="inline-start" aria-hidden="true" />
+                          ) : (
+                            <Copy data-icon="inline-start" aria-hidden="true" />
+                          )}
+                          Copy agent prompt
+                        </Button>
                         <Button asChild variant="ghost" size="sm">
                           <a href={sanityUrl('result')} target="_blank" rel="noreferrer">
                             Put this in Sanity{' '}
