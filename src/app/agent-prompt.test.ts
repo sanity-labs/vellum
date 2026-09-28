@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import { starterCode, starters } from '../schema/starters'
 import * as define from '../schema/starters/sanity/define'
+import type { JsonObject } from '../shared/json'
 import { agentPrompt, defineHelpers, sanityNewPrompt } from './agent-prompt'
 
 const documentType = {
@@ -17,8 +18,35 @@ test('opens with the sanity.new prompt and carries the document', () => {
   const prompt = agentPrompt({ document, documentType, errors: [] })
   expect(prompt.startsWith(sanityNewPrompt)).toBe(true)
   expect(prompt).toContain('named `post`')
-  expect(prompt).toContain(JSON.stringify(document, null, 2))
+  expect(prompt).toContain(
+    JSON.stringify({ _id: 'post-the-logo-soup-problem', ...document }, null, 2),
+  )
+  expect(prompt).toContain('Give me the claim link as soon as you have it')
   expect(prompt).not.toContain('## Validation')
+})
+
+test('gives the document a readable _id without dots', () => {
+  const id = (value: JsonObject, name = 'post') =>
+    /"_id": "([^"]*)"/.exec(
+      agentPrompt({ document: value, documentType: { ...documentType, name }, errors: [] }),
+    )?.[1]
+  expect(id({ ...document, slug: { _type: 'slug', current: 'logo-soup' } })).toBe('post-logo-soup')
+  expect(id({ ...document, title: 'Crème brûlée: v2.0!' })).toBe('post-creme-brulee-v2-0')
+  expect(id({ _type: 'post', title: '' })).toBe('post')
+  expect(id(document, 'blog.post')).toBe('blog-post-the-logo-soup-problem')
+})
+
+test('names the fields the Markdown left empty', () => {
+  const prompt = agentPrompt({ document, documentType, errors: [] })
+  expect(prompt).toContain(
+    "## Empty fields\n\nMy Markdown didn't supply these, so they're empty: `excerpt`.",
+  )
+  const full = agentPrompt({
+    document: { ...document, excerpt: 'Short.' },
+    documentType,
+    errors: [],
+  })
+  expect(full).not.toContain('## Empty fields')
 })
 
 test('explains the helpers a Sanity starter imports from ./define', () => {
