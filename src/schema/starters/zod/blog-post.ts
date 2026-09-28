@@ -8,6 +8,7 @@ export const BlogPost = z
     author: z.string().optional(),
     publishedAt: z.iso.datetime({ offset: true }).optional(),
     category: z.enum(['Engineering', 'Design', 'Product', 'Company', 'Tutorial']).optional(),
+    tags: z.array(z.string()).optional(),
     body: z.string().meta({ format: 'markdown' }),
   })
   .meta({ title: 'Blog post' })

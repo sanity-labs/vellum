@@ -46,7 +46,8 @@ const longTextLength = 200
  *
  * Strings with `format: "markdown"` or `contentMediaType: "text/markdown"` become Portable
  * Text. Arrays of objects become arrays of named object types; `anyOf` items become one member
- * each, named by their `title` or a `const` `type` property.
+ * each, named by their `title` or a `const` `type` property. Arrays of one plain type, like a
+ * list of tags, fill from a comma-separated line.
  */
 export function typesFromJsonSchema(input: object, name?: string): JsonSchemaConversion {
   const root = input as JsonSchema
@@ -113,8 +114,8 @@ export function typesFromJsonSchema(input: object, name?: string): JsonSchemaCon
           arrayMember(variant, singular(name), index, path),
         )
         if (members.some((member) => !member)) return undefined
-        if (members.some((member) => member?.type !== 'object'))
-          unmapped.push(`${path} (array of ${typeOf(items) ?? 'mixed'} values)`)
+        if (members.length > 1 && members.some((member) => member?.type !== 'object'))
+          unmapped.push(`${path} (array of mixed values)`)
         return { ...base, type: 'array', of: members }
       }
     }

@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
 import {
   type DocumentProgress,
@@ -18,7 +19,7 @@ import type { Binding } from '../mapping/binding'
 import { type Block, changedBlocks, spanText, splitBlocks } from '../mapping/blocks'
 import { mapAddedBlocks } from '../mapping/map'
 import { editRichText, replaceUnique } from '../rich-text/edit'
-import { coerceFieldValue, scalarTypes } from '../schema/coerce'
+import { coerceFieldValue, listItemSchema, scalarTypes } from '../schema/coerce'
 import { createSchema, loadSchema, type SchemaNode, type SchemaRegistry } from '../schema/registry'
 import { validateMappedDocument } from '../schema/validation'
 import { documentDiff } from './patch-diff'
@@ -87,11 +88,13 @@ export async function applyDocumentEdits(
         throw new Error('Text replacement requires a string or rich-text field.')
       return
     }
+    // A list of plain values has no keys to keep, so it can be replaced whole.
     if (
       edit.op === 'set' &&
       target.value !== undefined &&
       typeof target.value === 'object' &&
-      target.value !== null
+      target.value !== null &&
+      !listItemSchema(target.schema, registry)
     )
       throw new Error('Edit existing objects and arrays by field or key instead of replacing them.')
     if (edit.op !== 'set' && target.schema.extends !== 'array')
@@ -185,22 +188,27 @@ function remainder(blocks: Block[], excluded: Set<Block>) {
 function fieldsHolding(
   block: Block,
   remaining: Block[],
+  document: JsonObject,
   leaves: ReturnType<typeof documentLeaves>,
   registry: SchemaRegistry,
   type: string,
 ): FieldValue[] {
   const fields = registry
     .fields(registry.getDocument(type).schema)
-    .filter((field) => scalarTypes.has(field.typeDef.extends))
+    .filter(
+      (field) => scalarTypes.has(field.typeDef.extends) || listItemSchema(field.typeDef, registry),
+    )
   const supplies = (candidate: Block, schema: SchemaNode, value: Json) =>
-    candidate.spans.some(
-      (span) => coerceFieldValue(spanText(span, candidate), schema, registry) === value,
+    candidate.spans.some((span) =>
+      isDeepStrictEqual(coerceFieldValue(spanText(span, candidate), schema, registry), value),
     )
   return fields.flatMap((field) => {
-    const leaf = leaves.find((leaf) => leaf.path[0] === field.name && leaf.path.length <= 2)
-    if (!leaf || !supplies(block, field.typeDef, leaf.value)) return []
-    if (remaining.some((other) => supplies(other, field.typeDef, leaf.value))) return []
-    return [{ name: field.name, value: leaf.value }]
+    const value = listItemSchema(field.typeDef, registry)
+      ? document[field.name]
+      : leaves.find((leaf) => leaf.path[0] === field.name && leaf.path.length <= 2)?.value
+    if (value === undefined || !supplies(block, field.typeDef, value)) return []
+    if (remaining.some((other) => supplies(other, field.typeDef, value))) return []
+    return [{ name: field.name, value }]
   })
 }
 
@@ -262,7 +270,7 @@ export async function runDocumentPatch(
       const leaves = documentLeaves(input.document, registry, type)
       const removed = changedBlocks(added.before, added.after).map((block) => ({
         block,
-        fields: fieldsHolding(block, added.after, leaves, registry, type),
+        fields: fieldsHolding(block, added.after, input.document, leaves, registry, type),
         mentioned: leaves.some((leaf) => String(leaf.value).includes(block.text)),
       }))
       if (removed.some(({ fields }) => fields.length > 1))

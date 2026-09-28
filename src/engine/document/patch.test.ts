@@ -629,6 +629,52 @@ test('replaces, removes, and refuses ambiguous field values from source edits', 
   expect(doc.slug.current).toBe('first-path')
 })
 
+test('replaces and removes a list field when its comma-separated line changes', async () => {
+  const registry = createSchema({
+    types: {
+      note: {
+        extends: 'document',
+        fields: [
+          { name: 'title', typeDef: { extends: 'string' } },
+          {
+            name: 'tags',
+            typeDef: { extends: 'array', of: [{ name: 'string', typeDef: { extends: 'string' } }] },
+          },
+          {
+            name: 'text',
+            typeDef: { extends: 'array', of: [{ name: 'block', typeDef: { extends: 'block' } }] },
+          },
+        ],
+      },
+    },
+  })
+  const source = '# A document\n\nKeep this paragraph intact.\n\nTags: React, Open source'
+  const doc = {
+    _type: 'note',
+    title: 'A document',
+    tags: ['React', 'Open source'],
+    text: convert('Keep this paragraph intact.', registry.getTarget('note.text'), registry).blocks,
+  }
+  const version = await documentVersion(doc)
+  const patch = (next: string) =>
+    runDocumentPatch(
+      documentPatchRequest.parse({
+        document: doc,
+        baseVersion: version,
+        schema: JSON.stringify(registry.descriptor),
+        sourceBaseline: { source, version },
+        source: next,
+      }),
+      signal(),
+    )
+  fakeJev({ assign: { 'B002.value': ['tags'] } })
+  const replaced = await patch(`${source}, Sanity`)
+  expect(replaced.document).toEqual({ ...doc, tags: ['React', 'Open source', 'Sanity'] })
+  const removed = await patch(source.replace('\n\nTags: React, Open source', ''))
+  const { tags: _tags, ...withoutTags } = doc
+  expect(removed.document).toEqual(withoutTags)
+})
+
 test.each(['## Enter <LogoSoup />', '## Enter \\<LogoSoup />'])(
   'adds inline code to the Logo Soup heading locally (%s)',
   async (heading) => {

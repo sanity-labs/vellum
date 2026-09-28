@@ -20,6 +20,7 @@ export const blogPost = defineType({
       type: 'string',
       options: { list: ['Engineering', 'Design', 'Product', 'Company', 'Tutorial'] },
     },
+    { name: 'tags', type: 'array', of: [{ type: 'string' }] },
     { name: 'body', title: 'Body', ...richText, validation: required },
   ],
 })
