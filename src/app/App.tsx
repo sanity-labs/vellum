@@ -64,7 +64,7 @@ const samples = new Set(starters.map((starter) => starter.source))
 
 const defaultStarter = starters[0]
 
-function sanityUrl(placement: 'sidebar' | 'result') {
+function sanityUrl(placement: 'sidebar') {
   const url = new URL('https://www.sanity.io/get-started')
   url.searchParams.set('utm_source', 'vellum')
   url.searchParams.set('utm_medium', 'referral')
@@ -962,7 +962,7 @@ export function App() {
                           `${result.documentType?.name} in ${(result.elapsedMs / 1000).toFixed(2)}s${result.patch ? `, ${result.patch.edits} ${result.patch.edits === 1 ? 'change' : 'changes'}` : ''}`
                         )}
                       </span>
-                      <div className="result-actions flex items-center gap-1">
+                      <div className="flex items-center gap-1">
                         <Button
                           type="button"
                           variant="ghost"
@@ -977,12 +977,6 @@ export function App() {
                             <Copy data-icon="inline-start" aria-hidden="true" />
                           )}
                           Copy agent prompt
-                        </Button>
-                        <Button asChild variant="ghost" size="sm">
-                          <a href={sanityUrl('result')} target="_blank" rel="noreferrer">
-                            Put this in Sanity{' '}
-                            <ArrowRight data-icon="inline-end" aria-hidden="true" />
-                          </a>
                         </Button>
                         {previousResult && (
                           <Button
