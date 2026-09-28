@@ -126,6 +126,7 @@ export function App() {
     title: string
   } | null>(null)
   const [progress, setProgress] = useState('')
+  const [draft, setDraft] = useState<JsonObject>()
   const [panel, setPanel] = useState<'schema' | 'code' | null>(null)
   const [tab, setTab] = useState('preview')
   const [inspected, setInspected] = useState<string>()
@@ -312,6 +313,7 @@ export function App() {
     setRunning(true)
     setUpdating(incremental)
     setResolvedType(null)
+    setDraft(undefined)
     setProgress(incremental ? 'Planning changes…' : 'Reading the schema…')
     if (!incremental) {
       setResult(undefined)
@@ -325,6 +327,7 @@ export function App() {
         onProgress(event) {
           if (event.type === 'progress') setProgress(event.message)
           if (event.type === 'document-type') setResolvedType(event.documentType)
+          if (event.type === 'draft') setDraft(event.document)
         },
       }
       const next =
@@ -359,6 +362,7 @@ export function App() {
     } finally {
       setRunning(false)
       setUpdating(false)
+      setDraft(undefined)
       controller.current = null
     }
   }
@@ -786,7 +790,13 @@ export function App() {
                         {progress}
                       </span>
                     </div>
-                    <div className="empty-state">Mapping source to the schema…</div>
+                    {draft && Object.keys(draft).length > 1 ? (
+                      <div className="result-content">
+                        <DocumentPreview value={draft} />
+                      </div>
+                    ) : (
+                      <div className="empty-state">Mapping source to the schema…</div>
+                    )}
                   </>
                 ) : result?.document ? (
                   <Tabs value={tab} onValueChange={setTab} className="result-tabs">

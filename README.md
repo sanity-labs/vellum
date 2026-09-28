@@ -114,6 +114,8 @@ const result = await vellum.convertDocument(
 
 `schema` is a schema descriptor, the JSON that `GET https://api.sanity.io/v1/descriptors/schemas/{id}` returns and `@sanity/schema-descriptor-utils` reads. Leave it out to map into the bundled admin schema. Leave out `documentType` and Jev picks one; if it isn't confident, `status` comes back `'needs-type'`, `document` is `null`, and `classification` lists the candidates.
 
+`onProgress` receives status messages, the chosen type, and `draft` events carrying the document as it fills in: fields as soon as they're confirmed, page sections one at a time. Drafts are for showing progress. They skip image and code decisions and aren't validated, so save only the final result.
+
 `result.document` has a `_type` and no `_id`, so it can go straight into `client.create()`. Check `result.validation` first: its `markers` are what `@sanity/validation` rejected. `result.confidence` holds the score for each path, and `result.warnings` includes the values that didn't clear `threshold` (0.7 unless you pass one).
 
 When the Markdown changes, send the new source with the previous result:
