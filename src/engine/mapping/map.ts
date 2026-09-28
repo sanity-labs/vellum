@@ -1,5 +1,5 @@
 import type { DocumentProgress, FieldEvidence } from '../../shared/contracts'
-import type { JsonObject } from '../../shared/json'
+import type { Json, JsonObject } from '../../shared/json'
 import { type Answer, decideInBatches, type Question } from '../jev/jev'
 import { type Answers, createLog, type Log, merge, windows } from '../jev/log'
 import type { SchemaNode, SchemaRegistry } from '../schema/registry'
@@ -47,6 +47,7 @@ type Scope = {
   signal: AbortSignal
   onProgress?: (event: DocumentProgress) => void
   path: string
+  draft?: { root: JsonObject; publish: () => void }
 }
 export type MappingInput = {
   source: string
@@ -76,7 +77,12 @@ export async function mapBlocks(
     stitchLines(splitBlocks(source), signal),
     createScope(registry, document, threshold, signal, onProgress),
   ])
-  const mapped = await mapObject(blocks, document.schema, document.title, scope, 0)
+  const root: JsonObject = { _type: typeName }
+  const draft = onProgress && {
+    root,
+    publish: () => onProgress({ type: 'draft', document: structuredClone(root) }),
+  }
+  const mapped = await mapObject(blocks, document.schema, document.title, { ...scope, draft }, 0)
   return {
     document: { _type: typeName, ...mapped.fields } as JsonObject,
     confidence: mapped.confidence,
@@ -150,9 +156,14 @@ async function mapObject(
       segment(blocks, streams.filter(isCollection), signal),
     ),
   ])
-  const fields: JsonObject = Object.fromEntries(
-    bindings.map(({ destination, value }) => [destination.name, value]),
-  )
+  const fields: JsonObject = {}
+  const draft = depth === 0 ? scope.draft : undefined
+  const write = (name: string, value: Json) => {
+    fields[name] = value
+    if (draft) draft.root[name] = value
+  }
+  for (const { destination, value } of bindings) write(destination.name, value)
+  if (bindings.length) draft?.publish()
   const confidence: Confidence = Object.fromEntries(
     bindings.map(({ destination, score }) => [destination.name, score]),
   )
@@ -166,12 +177,16 @@ async function mapObject(
     routeRuns(runs, blocks, assignments, streams, title, scope.registry, signal),
   )
   for (const [stream, group] of groupRuns(routed.routes, notes)) {
-    if (stream.kind === 'richText')
-      fields[stream.name] = group
-        .flatMap(({ run }) => run)
-        .map((block) => block.text)
-        .join('\n\n')
-    else if (depth < maxDepth) {
+    if (stream.kind === 'richText') {
+      write(
+        stream.name,
+        group
+          .flatMap(({ run }) => run)
+          .map((block) => block.text)
+          .join('\n\n'),
+      )
+      draft?.publish()
+    } else if (depth < maxDepth) {
       const collection = await mapCollection(group, stream, scope, depth + 1)
       if (collection.items.length) fields[stream.name] = collection.items
       Object.assign(confidence, collection.confidence)
@@ -223,6 +238,13 @@ async function mapCollection(
   const { path } = scope
   scope.onProgress?.({ type: 'progress', message: `Mapping ${stream.title}…` })
   const notes: string[] = []
+  const slots: JsonObject[] = []
+  const showItem = (index: number, item: JsonObject) => {
+    if (depth !== 1 || !scope.draft) return
+    slots[index] = item
+    scope.draft.root[stream.name] = slots.filter(Boolean)
+    scope.draft.publish()
+  }
   const mapped = await Promise.all(
     group.map(async ({ run, members }, index) => {
       if (!members.length) {
@@ -239,7 +261,9 @@ async function mapCollection(
           return { member, item, consumed: run.length - unconsumedCount(item.notes) }
         }),
       )
-      return attempts.reduce((a, b) => (b.consumed > a.consumed ? b : a))
+      const best = attempts.reduce((a, b) => (b.consumed > a.consumed ? b : a))
+      showItem(index, { _type: best.member.name, ...best.item.fields })
+      return best
     }),
   )
   const confidence: Confidence = {}

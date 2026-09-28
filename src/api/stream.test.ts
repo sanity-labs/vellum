@@ -43,6 +43,12 @@ test.each([undefined, 'page'])(
       type: 'document-type',
       documentType: { name: 'page' },
     })
+    const drafts = events.filter((event) => event.type === 'draft')
+    expect(drafts.map((event) => Object.keys(event.document).sort())).toEqual([
+      ['_type', 'title'],
+      ['_type', 'body', 'title'],
+    ])
+    expect(drafts.at(-1)).toMatchObject({ document: { body: [{ _type: 'block' }] } })
     expect(events.at(-1)).toMatchObject({
       type: 'complete',
       result: {

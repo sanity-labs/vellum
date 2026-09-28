@@ -3,7 +3,7 @@ import type {
   DocumentRunRequest,
   DocumentRunResult,
 } from '../../shared/contracts'
-import { documentVersion } from '../../shared/json'
+import { documentVersion, isObject, type JsonObject } from '../../shared/json'
 import { classifyDocument } from '../mapping/classify-document'
 import { type MappingInput, mapBlocks } from '../mapping/map'
 import {
@@ -75,7 +75,7 @@ export async function runDocument(
   const mapped = await mapper(
     { source: input.source, registry, typeName, threshold: input.threshold },
     signal,
-    onProgress,
+    onProgress && previewDrafts(onProgress, registry, typeName),
   )
   trace.push(...mapped.trace)
   onProgress?.({
@@ -159,4 +159,36 @@ export async function buildDocument(
     outputTokens: 0,
   })
   return { ...materialized, trace }
+}
+
+function previewDrafts(
+  onProgress: (event: DocumentProgress) => void,
+  registry: SchemaRegistry,
+  typeName: string,
+) {
+  return (event: DocumentProgress) =>
+    onProgress(
+      event.type === 'draft'
+        ? {
+            ...event,
+            document: stableKeys(materializeDocument(event.document, registry, typeName).document),
+          }
+        : event,
+    )
+}
+
+function stableKeys(value: JsonObject, path = ''): JsonObject {
+  return Object.fromEntries(
+    Object.entries(value).map(([name, child]) => {
+      if (!Array.isArray(child) || name === 'markDefs') return [name, child]
+      return [
+        name,
+        child.map((item, index) =>
+          isObject(item) && item._type !== 'block'
+            ? { ...stableKeys(item, `${path}${name}${index}.`), _key: `${path}${name}${index}` }
+            : item,
+        ),
+      ]
+    }),
+  )
 }
