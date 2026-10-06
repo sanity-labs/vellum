@@ -42,6 +42,7 @@ import {
   workspaceCatalog,
 } from '../shared/contracts'
 import { documentVersion, type JsonObject } from '../shared/json'
+import { trackConversionStarted, trackSanityLinkClicked } from './analytics'
 import { DocumentPreview } from './DocumentPreview'
 
 async function readResponse<T>(response: Response, schema: z.ZodType<T>) {
@@ -307,6 +308,10 @@ export function App() {
     if (busy || controller.current || !source.trim()) return
     if (incremental && !result?.document) return
     const base = result
+    trackConversionStarted(
+      incremental ? 'update' : base?.document ? 'rebuild' : 'create',
+      schemaChoice.id,
+    )
     toast.dismiss('conversion-error')
     const abort = new AbortController()
     controller.current = abort
@@ -677,7 +682,13 @@ export function App() {
               the AI Content Operating System, where that structure works for your teams, your
               automations, and your agents.
             </p>
-            <a className="made-by-cta" href={sanityUrl('sidebar')} target="_blank" rel="noreferrer">
+            <a
+              className="made-by-cta"
+              href={sanityUrl('sidebar')}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => trackSanityLinkClicked('sidebar', e.currentTarget.href)}
+            >
               Start a free Sanity project <ArrowRight aria-hidden="true" className="size-3.5" />
             </a>
             <a href="https://github.com/sanity-labs/vellum" target="_blank" rel="noreferrer">
@@ -936,7 +947,12 @@ export function App() {
                       </span>
                       <div className="flex items-center gap-1">
                         <Button asChild variant="ghost" size="sm">
-                          <a href={sanityUrl('result')} target="_blank" rel="noreferrer">
+                          <a
+                            href={sanityUrl('result')}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => trackSanityLinkClicked('result', e.currentTarget.href)}
+                          >
                             Put this in Sanity{' '}
                             <ArrowRight data-icon="inline-end" aria-hidden="true" />
                           </a>

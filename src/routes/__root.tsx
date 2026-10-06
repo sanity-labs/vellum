@@ -1,5 +1,13 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { AnalyticsInit } from '@sanity/frontend-analytics'
+import {
+  createRootRoute,
+  HeadContent,
+  Outlet,
+  Scripts,
+  useRouterState,
+} from '@tanstack/react-router'
+import { type ReactNode, useEffect } from 'react'
+import { rudderstackConfig, trackPageView } from '../app/analytics'
 import styles from '../app/styles.css?url'
 
 export const Route = createRootRoute({
@@ -12,7 +20,7 @@ export const Route = createRootRoute({
     ],
     links: [{ rel: 'stylesheet', href: styles }],
   }),
-  component: Outlet,
+  component: RootComponent,
   shellComponent: RootDocument,
   notFoundComponent: () => (
     <main className="p-6">
@@ -20,6 +28,21 @@ export const Route = createRootRoute({
     </main>
   ),
 })
+
+/** RudderStack is not consent-gated, matching www.sanity.io and research.sanity.io. */
+function RootComponent() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one page view per path
+  useEffect(() => {
+    trackPageView()
+  }, [pathname])
+  return (
+    <>
+      <AnalyticsInit config={rudderstackConfig()} />
+      <Outlet />
+    </>
+  )
+}
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (

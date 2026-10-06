@@ -12,6 +12,12 @@ export default defineConfig({
     nitro({
       vercel: { functions: { maxDuration: 120 } },
       handlers: [{ route: '/api/**', middleware: true, handler: './src/api/runtime.ts' }],
+      // First-party RudderStack paths, as on research.sanity.io. Vercel serves these as CDN rewrites.
+      routeRules: {
+        '/intake/dp/**': { proxy: 'https://sanity-dataplane.rudderstack.com/**' },
+        '/intake/api/**': { proxy: 'https://api.rudderstack.com/**' },
+        '/intake/cdn/**': { proxy: 'https://cdn.rudderlabs.com/**' },
+      },
     }),
     react(),
     tailwindcss(),
