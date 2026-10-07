@@ -1,6 +1,6 @@
 {
   "name": "@sanity-labs/vellum",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Map Markdown into Sanity documents with a classifier instead of a text generator",
   "keywords": [
     "sanity",
