@@ -189,6 +189,69 @@ button[data-size][data-size^="icon"],
   font-weight: 600;
   letter-spacing: -0.6px;
 }
+.vellum-trigger {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  transition:
+    color 120ms,
+    background-color 120ms;
+}
+.vellum-trigger:hover,
+.vellum-trigger[data-state="open"] {
+  color: var(--foreground);
+  background: var(--accent);
+}
+.vellum-trigger:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.vellum-trigger svg {
+  width: 15px;
+  height: 15px;
+}
+.vellum-definition {
+  width: 18rem;
+  gap: 8px;
+  padding: 14px 16px;
+  line-height: 1.5;
+}
+.vellum-headword {
+  font-family: ui-serif, Georgia, serif;
+  font-size: 19px;
+  letter-spacing: -0.2px;
+}
+.vellum-pos {
+  font-style: italic;
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+.vellum-definition ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  color: var(--muted-foreground);
+}
+.vellum-definition ol li::marker {
+  font-variant-numeric: tabular-nums;
+}
+.vellum-definition a {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  color: var(--primary);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.vellum-definition svg {
+  width: 14px;
+  height: 14px;
+}
 .workbench {
   display: grid;
   flex: 1;
