@@ -140,6 +140,11 @@ export async function applyDocumentEdits(
       continue
     }
     const value = converted.document[`value${index}`]
+    // An emptied list is unset, the way Studio unsets it, and inserting nothing changes nothing.
+    if (value === undefined && Array.isArray(edit.value) && !edit.value.length) {
+      if (edit.op === 'set') writeAt(document, edit.path)
+      continue
+    }
     if (value === undefined)
       throw new Error(
         'The new value could not be mapped without missing data. The update was not applied.',
