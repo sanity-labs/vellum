@@ -2,7 +2,7 @@ import { createSchemaFromManifestTypes } from '@sanity/schema/_internal'
 import { convertToDefinition } from '@sanity/schema-descriptor-utils'
 import { validateDocument } from '@sanity/validation'
 import { z } from 'zod'
-import type { JsonObject } from '../../shared/json'
+import { type JsonObject, readablePath } from '../../shared/json'
 import type { SchemaNode, SchemaRegistry } from './registry'
 
 type CompiledSchema = ReturnType<typeof createSchemaFromManifestTypes>
@@ -107,30 +107,4 @@ export async function validateMappedDocument(
         : []),
     ],
   }
-}
-
-/** Writes `['items', { _key: 'a1b2' }, 'title']` as `items[0].title`, which a reader can find. */
-function readablePath(document: JsonObject, path: unknown[]) {
-  let value: unknown = document
-  let text = ''
-  for (const segment of path) {
-    if (segment && typeof segment === 'object' && '_key' in segment) {
-      const items = Array.isArray(value) ? value : []
-      const index = items.findIndex(
-        (item) => item && typeof item === 'object' && item._key === segment._key,
-      )
-      text += index >= 0 ? `[${index}]` : `[_key="${String(segment._key)}"]`
-      value = items[index]
-    } else if (typeof segment === 'number') {
-      text += `[${segment}]`
-      value = Array.isArray(value) ? value[segment] : undefined
-    } else {
-      text += text ? `.${String(segment)}` : String(segment)
-      value =
-        value && typeof value === 'object'
-          ? (value as Record<string, unknown>)[String(segment)]
-          : undefined
-    }
-  }
-  return text
 }

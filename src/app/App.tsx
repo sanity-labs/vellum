@@ -43,7 +43,7 @@ import {
   type WorkspaceCatalog,
   workspaceCatalog,
 } from '../shared/contracts'
-import { documentVersion, type JsonObject } from '../shared/json'
+import { documentVersion, type JsonObject, readablePath } from '../shared/json'
 import { type AgentPromptInput, agentPrompt } from './agent-prompt'
 import { DocumentPreview } from './DocumentPreview'
 
@@ -122,6 +122,18 @@ export function App() {
     () => (plain && schemaChoice.zod ? schemaChoice.zod.safeParse(plain) : undefined),
     [plain, schemaChoice.zod],
   )
+  // Required errors by the paths the Fields view uses, so an empty required field reads as one.
+  const required = useMemo(() => {
+    const document = result?.document
+    const markers = result?.validation?.markers ?? []
+    return new Set(
+      document
+        ? markers
+            .filter((marker) => marker.code === 'value.required' && marker.level === 'error')
+            .map((marker) => readablePath(document, marker.path))
+        : [],
+    )
+  }, [result?.document, result?.validation])
   const resultRef = useRef(result)
   resultRef.current = result
   const [resolvedType, setResolvedType] = useState<{
@@ -901,6 +913,7 @@ export function App() {
                       <DocumentPreview
                         value={result.document}
                         confidence={result.confidence}
+                        required={required}
                         inspect={
                           result.evidence && {
                             evidence: result.evidence,
