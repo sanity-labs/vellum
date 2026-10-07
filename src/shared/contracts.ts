@@ -141,6 +141,7 @@ const documentProgress = z.discriminatedUnion('type', [
     type: z.literal('document-type'),
     documentType: documentSummary.pick({ name: true, title: true }),
   }),
+  z.object({ type: z.literal('draft'), document: z.record(z.string(), z.json()) }),
 ])
 export type DocumentProgress = z.infer<typeof documentProgress>
 export const documentRunEvent = z.union([

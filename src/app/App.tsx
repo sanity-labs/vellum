@@ -1,3 +1,4 @@
+import { track } from '@vercel/analytics'
 import { ArrowRight, Check, ChevronDown, Copy, LoaderCircle, RotateCw } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -127,6 +128,7 @@ export function App() {
     title: string
   } | null>(null)
   const [progress, setProgress] = useState('')
+  const [draft, setDraft] = useState<JsonObject>()
   const [panel, setPanel] = useState<'schema' | 'code' | null>(null)
   const [tab, setTab] = useState('preview')
   const [inspected, setInspected] = useState<string>()
@@ -314,6 +316,7 @@ export function App() {
     setRunning(true)
     setUpdating(incremental)
     setResolvedType(null)
+    setDraft(undefined)
     setProgress(incremental ? 'Planning changes…' : 'Reading the schema…')
     if (!incremental) {
       setResult(undefined)
@@ -328,6 +331,7 @@ export function App() {
         onProgress(event) {
           if (event.type === 'progress') setProgress(event.message)
           if (event.type === 'document-type') setResolvedType(event.documentType)
+          if (event.type === 'draft') setDraft(event.document)
         },
       }
       const next =
@@ -352,6 +356,12 @@ export function App() {
       abort.signal.throwIfAborted()
       setInspected(undefined)
       setResult(next)
+      track('Map document', {
+        mode: incremental ? 'update' : 'create',
+        schema: schemaChoice.id,
+        format: schemaFormat,
+        status: next.status,
+      })
     } catch (error) {
       if (!abort.signal.aborted) {
         toast.error(incremental ? 'Update failed' : 'Conversion failed', {
@@ -362,6 +372,7 @@ export function App() {
     } finally {
       setRunning(false)
       setUpdating(false)
+      setDraft(undefined)
       controller.current = null
     }
   }
@@ -393,6 +404,7 @@ export function App() {
     anchor.download = `${result.documentType?.name ?? 'document'}.json`
     anchor.click()
     URL.revokeObjectURL(url)
+    track('Download JSON', { tab })
   }
 
   async function copy() {
@@ -400,6 +412,7 @@ export function App() {
     try {
       await navigator.clipboard.writeText(tab === 'plain' ? plainJson : resultJson)
       setCopied(true)
+      track('Copy JSON', { tab })
       setTimeout(() => setCopied(false), 1800)
     } catch {
       toast.error('Clipboard access was unavailable', { description: 'Use Download JSON instead.' })
@@ -430,6 +443,7 @@ export function App() {
     try {
       await navigator.clipboard.writeText(prompt)
       setPromptCopied(true)
+      track('Copy agent prompt', { schema: schemaChoice.id, format: schemaFormat })
       setTimeout(() => setPromptCopied(false), 1800)
       toast.success('Prompt copied', {
         description:
@@ -711,7 +725,13 @@ export function App() {
               the AI Content Operating System, where that structure works for your teams, your
               automations, and your agents.
             </p>
-            <a className="made-by-cta" href={sanityUrl('sidebar')} target="_blank" rel="noreferrer">
+            <a
+              className="made-by-cta"
+              href={sanityUrl('sidebar')}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => track('Put in Sanity', { placement: 'sidebar' })}
+            >
               Start a free Sanity project <ArrowRight aria-hidden="true" className="size-3.5" />
             </a>
             <a href="https://github.com/sanity-labs/vellum" target="_blank" rel="noreferrer">
@@ -824,7 +844,13 @@ export function App() {
                         {progress}
                       </span>
                     </div>
-                    <div className="empty-state">Mapping source to the schema…</div>
+                    {draft && Object.keys(draft).length > 1 ? (
+                      <div className="result-content">
+                        <DocumentPreview value={draft} />
+                      </div>
+                    ) : (
+                      <div className="empty-state">Mapping source to the schema…</div>
+                    )}
                   </>
                 ) : result?.document ? (
                   <Tabs value={tab} onValueChange={setTab} className="result-tabs">
