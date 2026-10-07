@@ -22,17 +22,21 @@ type Inspect = {
 }
 const sureAbove = 0.85
 const noValue = '__none__'
+const none: ReadonlySet<string> = new Set()
 
 export const DocumentPreview = memo(function DocumentPreview({
   value,
   confidence = {},
   inspect,
+  required = none,
   path = '',
   depth = 0,
 }: {
   value: Json
   confidence?: Confidence
   inspect?: Inspect
+  /** Paths that failed Sanity's required rule, such as `price` or `content[0].form`. */
+  required?: ReadonlySet<string>
   path?: string
   depth?: number
 }) {
@@ -67,6 +71,7 @@ export const DocumentPreview = memo(function DocumentPreview({
               value={item}
               confidence={confidence}
               inspect={inspect}
+              required={required}
               path={`${path}[${index}]`}
               depth={depth + 1}
             />
@@ -78,13 +83,15 @@ export const DocumentPreview = memo(function DocumentPreview({
   if (value._type === 'slug' && typeof value.current === 'string')
     return <p className="document-value">/{value.current.replace(/^\//, '')}</p>
   const present = Object.entries(value).filter(([name]) => !['_type', '_key'].includes(name))
-  // Fields Vellum looked for and left empty, so a reviewer can see why.
-  const empty = Object.entries(inspect?.evidence ?? {}).flatMap(([key, evidence]) => {
+  // Fields Vellum looked for and left empty, so a reviewer can see why, and required fields with
+  // no value, including ones it never looked for, such as references.
+  const looked = Object.entries(inspect?.evidence ?? {}).flatMap(([key, evidence]) =>
+    evidence.status === 'empty' ? [key] : [],
+  )
+  const empty = [...new Set([...looked, ...required])].flatMap((key) => {
     const name = path ? key.slice(path.length + 1) : key
     const own = path ? key.startsWith(`${path}.`) : true
-    return own && evidence.status === 'empty' && /^\w+$/.test(name) && !(name in value)
-      ? [name]
-      : []
+    return own && /^\w+$/.test(name) && !(name in value) ? [name] : []
   })
   return (
     <div className="document-object">
@@ -126,12 +133,17 @@ export const DocumentPreview = memo(function DocumentPreview({
                 </dt>
                 <dd>
                   {child === undefined ? (
-                    <span className="text-muted-foreground">Left empty</span>
+                    required.has(childPath) ? (
+                      <span className="text-destructive">Required</span>
+                    ) : (
+                      <span className="text-muted-foreground">Left empty</span>
+                    )
                   ) : (
                     <DocumentPreview
                       value={child}
                       confidence={confidence}
                       inspect={inspect}
+                      required={required}
                       path={childPath}
                       depth={depth + 1}
                     />
