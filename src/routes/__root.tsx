@@ -1,4 +1,5 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
+import { Analytics } from '@vercel/analytics/react'
 import type { ReactNode } from 'react'
 import styles from '../app/styles.css?url'
 
@@ -29,6 +30,7 @@ function RootDocument({ children }: { children: ReactNode }) {
       </head>
       <body>
         {children}
+        <Analytics />
         <Scripts />
       </body>
     </html>

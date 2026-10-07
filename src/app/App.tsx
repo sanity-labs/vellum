@@ -1,3 +1,4 @@
+import { track } from '@vercel/analytics'
 import { ArrowRight, Check, ChevronDown, Copy, LoaderCircle, RotateCw } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -352,6 +353,12 @@ export function App() {
       abort.signal.throwIfAborted()
       setInspected(undefined)
       setResult(next)
+      track('Map document', {
+        mode: incremental ? 'update' : 'create',
+        schema: schemaChoice.id,
+        format: schemaFormat,
+        status: next.status,
+      })
     } catch (error) {
       if (!abort.signal.aborted) {
         toast.error(incremental ? 'Update failed' : 'Conversion failed', {
@@ -394,6 +401,7 @@ export function App() {
     anchor.download = `${result.documentType?.name ?? 'document'}.json`
     anchor.click()
     URL.revokeObjectURL(url)
+    track('Download JSON', { tab })
   }
 
   async function copy() {
@@ -401,6 +409,7 @@ export function App() {
     try {
       await navigator.clipboard.writeText(tab === 'plain' ? plainJson : resultJson)
       setCopied(true)
+      track('Copy JSON', { tab })
       setTimeout(() => setCopied(false), 1800)
     } catch {
       toast.error('Clipboard access was unavailable', { description: 'Use Download JSON instead.' })
@@ -677,7 +686,13 @@ export function App() {
               the AI Content Operating System, where that structure works for your teams, your
               automations, and your agents.
             </p>
-            <a className="made-by-cta" href={sanityUrl('sidebar')} target="_blank" rel="noreferrer">
+            <a
+              className="made-by-cta"
+              href={sanityUrl('sidebar')}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => track('Put in Sanity', { placement: 'sidebar' })}
+            >
               Start a free Sanity project <ArrowRight aria-hidden="true" className="size-3.5" />
             </a>
             <a href="https://github.com/sanity-labs/vellum" target="_blank" rel="noreferrer">
@@ -936,7 +951,12 @@ export function App() {
                       </span>
                       <div className="flex items-center gap-1">
                         <Button asChild variant="ghost" size="sm">
-                          <a href={sanityUrl('result')} target="_blank" rel="noreferrer">
+                          <a
+                            href={sanityUrl('result')}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={() => track('Put in Sanity', { placement: 'result' })}
+                          >
                             Put this in Sanity{' '}
                             <ArrowRight data-icon="inline-end" aria-hidden="true" />
                           </a>
