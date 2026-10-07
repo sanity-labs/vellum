@@ -271,6 +271,43 @@ test('rejects unknown fields, array members and invalid enums, and never keeps i
   expect(result.warnings.join(' ')).toContain('needs an existing reference')
 })
 
+test('an array left with no items is omitted, so a required array reports Required', async () => {
+  const required = [{ rules: [{ type: 'required' }] }]
+  const registry = createSchema({
+    types: {
+      post: {
+        extends: 'document',
+        fields: [
+          {
+            name: 'tags',
+            typeDef: {
+              extends: 'array',
+              validation: required,
+              of: [{ name: 'tag', typeDef: { extends: 'string' } }],
+            },
+          },
+          {
+            name: 'authors',
+            typeDef: {
+              extends: 'array',
+              validation: required,
+              of: [{ name: 'author', typeDef: { extends: 'reference', to: [{ name: 'post' }] } }],
+            },
+          },
+        ],
+      },
+    },
+  })
+  const result = materializeDocument(
+    { _type: 'post', tags: ['  '], authors: [{ _type: 'reference', _ref: 'invented' }] },
+    registry,
+    'post',
+  )
+  expect(result.document).toEqual({ _type: 'post' })
+  const validation = await validateMappedDocument(result.document, registry, signal())
+  expect(validation.errors).toEqual(['tags: Required', 'authors: Required'])
+})
+
 test('materializes mixed nested page-builder sections and rejects mistyped scalars', () => {
   expect(
     materializeDocument({ _type: 'landingPage', title: 42 }, defaultSchema, 'landingPage').errors,

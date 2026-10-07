@@ -80,7 +80,7 @@ export function materializeDocument(
       return undefined
     }
     const members = registry.members(schema)
-    return value.flatMap((item, index) => {
+    const items = value.flatMap((item, index) => {
       const object = item && typeof item === 'object' && !Array.isArray(item) ? item : undefined
       const member = members.find((candidate) =>
         object
@@ -106,6 +106,8 @@ export function materializeDocument(
           : mapped,
       ]
     })
+    // Studio unsets an emptied array, and a required array only fails when the value is missing.
+    return items.length ? items : undefined
   }
 
   function visitObject(

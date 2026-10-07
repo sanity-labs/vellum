@@ -267,6 +267,44 @@ test('removes only the requested keyed item and preserves explicit false values'
   expect(documentDiff(page, result.document)).toEqual([{ unset: ['["items"][_key=="one"]'] }])
 })
 
+test('setting a list to [] unsets it, so a required list reports Required', async () => {
+  const list = (validation: { rules: { type: string }[] }[]) => ({
+    extends: 'array',
+    validation,
+    of: [{ name: 'string', typeDef: { extends: 'string' } }],
+  })
+  const registry = createSchema({
+    types: {
+      note: {
+        extends: 'document',
+        fields: [
+          { name: 'tags', typeDef: list([]) },
+          { name: 'topics', typeDef: list([{ rules: [{ type: 'required' }] }]) },
+        ],
+      },
+    },
+  })
+  const note = { _type: 'note', tags: ['React'], topics: ['Content'] }
+  const result = await applyDocumentEdits(
+    await request(note),
+    plan([
+      { op: 'set', path: ['tags'], value: [] },
+      { op: 'set', path: ['topics'], value: [] },
+    ]),
+    registry,
+    signal(),
+  )
+  expect(result.document).toEqual({ _type: 'note' })
+  expect(result.validation.errors).toEqual(['topics: Required'])
+  const appended = await applyDocumentEdits(
+    await request(note),
+    plan([{ op: 'append', path: ['tags'], value: [] }]),
+    registry,
+    signal(),
+  )
+  expect(appended.document).toEqual(note)
+})
+
 test('does not apply cancelled plans', async () => {
   const abort = new AbortController()
   abort.abort()
