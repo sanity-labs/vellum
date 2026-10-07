@@ -29,6 +29,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { VellumDefinition } from '@/components/vellum-definition'
 import jobPostingSource from '../examples/starters/job-posting.md?raw'
 import jsonSchemaExample from '../examples/starters/job-posting.schema.json?raw'
 import { compileSchemaCode } from '../schema/code'
@@ -461,12 +462,15 @@ export function App() {
         <Sidebar aria-label="Conversion settings">
           <SidebarHeader className="settings-header">
             <div className="flex items-center justify-between">
-              <h1 className="brand">
-                <a href="/">Vellum</a>
-              </h1>
+              <div className="flex items-center gap-1">
+                <h1 className="brand">
+                  <a href="/">Vellum</a>
+                </h1>
+                <VellumDefinition />
+              </div>
               <SidebarTrigger aria-label="Close settings" className="md:hidden" />
             </div>
-            <p className="text-xs text-muted-foreground">Text into structure</p>
+            <p className="text-xs text-muted-foreground">Markdown into structure</p>
           </SidebarHeader>
           <SidebarContent className="settings-content">
             <FieldGroup>
