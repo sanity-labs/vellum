@@ -1,5 +1,13 @@
 # @sanity-labs/vellum
 
+## 0.2.1
+
+### Patch Changes
+
+- [#12](https://github.com/sanity-labs/vellum/pull/12) [`c6d09c1`](https://github.com/sanity-labs/vellum/commit/c6d09c1c6dd522c04e45c39bac9164668c16932e) Thanks [@kmelve](https://github.com/kmelve)! - The package no longer depends on `@vercel/analytics`, which 0.2.0 listed by mistake. Only the playground uses it.
+
+- [#15](https://github.com/sanity-labs/vellum/pull/15) [`e5c72f1`](https://github.com/sanity-labs/vellum/commit/e5c72f131e18fb1819bf13209bf1c5e293591310) Thanks [@kmelve](https://github.com/kmelve)! - An update that sets a list to `[]` now removes the field, the way Studio unsets an emptied array. It used to keep `[]`, which passes Sanity's required rule, so clearing a required list came back without an error. It now reports `Required`.
+
 ## 0.2.0
 
 ### Minor Changes
